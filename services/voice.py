@@ -214,13 +214,13 @@ def _generate_audio(text):
 
 def speak_sequence(messages, delay=0.0):
     """
-    একাধিক voice message একসাথে একটি audio file হিসেবে তৈরি করে।
+    একাধিক voice message sequentially handle করে।
 
-    এতে:
-        - voice overlap হবে না
-        - multiple audio player হবে না
-        - English text পড়বে না
-        - browser-side audio হবে
+    Agriculture Result Card-এর জন্য:
+        - একই সময়ে অনেক voice trigger হবে না
+        - সব message একসাথে একটি Bangla audio-তে যাবে
+        - English UI words বাদ যাবে
+        - duplicate audio regeneration এড়ানো হবে
     """
 
     _init_voice_state()
@@ -240,22 +240,14 @@ def speak_sequence(messages, delay=0.0):
     if not prepared_messages:
         return
 
-    # --------------------------------------------------------
-    # একাধিক sentence একসাথে
-    # --------------------------------------------------------
-
-    final_text = " । ".join(
-        prepared_messages
-    )
-
-    # --------------------------------------------------------
-    # Same voice হলে আবার generate না করা
-    # --------------------------------------------------------
+    # একই result-এর main points একসাথে বলা হবে।
+    final_text = " । ".join(prepared_messages)
 
     voice_hash = hashlib.md5(
         final_text.encode("utf-8")
     ).hexdigest()
 
+    # একই voice আবার generate করবে না।
     if st.session_state.get("voice_hash") == voice_hash:
         return
 
@@ -264,16 +256,130 @@ def speak_sequence(messages, delay=0.0):
     if audio is None:
         return
 
-    # --------------------------------------------------------
-    # Store audio
-    # --------------------------------------------------------
-
     st.session_state["voice_audio"] = audio
     st.session_state["voice_hash"] = voice_hash
 
     st.session_state["voice_version"] = (
         st.session_state.get("voice_version", 0) + 1
     )
+
+
+# ============================================================
+# GROWTH STAGE VOICE
+# ============================================================
+
+def growth_stage_auto_voice(stage_label):
+    """Announce the automatically detected growth stage first."""
+    if not stage_label:
+        return
+
+    speak_sequence([
+        f"স্বয়ংক্রিয়ভাবে আপনার ফসলের পর্যায় নির্ধারণ করা হয়েছে {stage_label}।",
+        "আপনি চাইলে নিচের বৃদ্ধি পর্যায় থেকে অন্য পর্যায় নির্বাচন করতে পারেন।"
+    ], delay=0.10)
+
+
+# ============================================================
+# AGRICULTURE RECOMMENDATION VOICE
+# ============================================================
+
+def agriculture_recommendation_voice(recommendations):
+    if not recommendations:
+        return
+
+    if isinstance(recommendations, str):
+        messages = [recommendations]
+    else:
+        messages = list(recommendations)
+
+    speak_sequence(messages)
+
+
+# ============================================================
+# AGRICULTURE RESULT VOICE
+# ============================================================
+
+def agriculture_result_voice(
+    irrigation_needed,
+    water_liters=0,
+    gross_irrigation=0,
+    available_water=0,
+    effective_rain=0,
+    net_irrigation=0,
+    no_rain_message="",
+):
+    """
+    Agriculture Result Card-এর জন্য farmer-friendly main voice।
+
+    Voice-এ technical calculation যেমন ET0, Kc, formula ইত্যাদি
+    বলা হবে না। শুধু farmer-এর জন্য প্রয়োজনীয় সিদ্ধান্ত বলা হবে।
+    """
+
+    messages = []
+
+    # --------------------------------------------------------
+    # 1. MAIN DECISION
+    # --------------------------------------------------------
+
+    if irrigation_needed:
+
+        messages.append(
+            f"আজ আপনার জমিতে সেচ প্রয়োজন। "
+            f"প্রায় {water_liters:.0f} লিটার পানি "
+            f"অথবা {gross_irrigation:.1f} মিলিমিটার সেচ দিতে হবে।"
+        )
+
+    else:
+
+        messages.append(
+            "আজ আপনার জমিতে অতিরিক্ত সেচ দেওয়ার প্রয়োজন নেই। "
+            "জমিতে থাকা পানি এবং বৃষ্টির পানি "
+            "বর্তমান প্রয়োজন মেটাতে যথেষ্ট।"
+        )
+
+    # --------------------------------------------------------
+    # 2. WATER BALANCE
+    # --------------------------------------------------------
+
+    if irrigation_needed:
+
+        messages.append(
+            f"জমিতে থাকা পানি {available_water:.1f} মিলিমিটার "
+            f"এবং কার্যকর বৃষ্টির পানি {effective_rain:.1f} মিলিমিটার। "
+            f"সব বাদ দেওয়ার পর পানির ঘাটতি "
+            f"{net_irrigation:.1f} মিলিমিটার।"
+        )
+
+    # --------------------------------------------------------
+    # 3. NO RAIN DECISION
+    # --------------------------------------------------------
+
+    if no_rain_message:
+        messages.append(no_rain_message)
+
+    speak_sequence(messages)
+
+
+# ============================================================
+# SMART RECOMMENDATION VOICE
+# ============================================================
+
+def agriculture_recommendation_voice(recommendations):
+    """
+    Smart Recommendation-এর voice।
+
+    User চাইলে আলাদাভাবে recommendation শুনবে।
+    """
+
+    if not recommendations:
+        return
+
+    if isinstance(recommendations, str):
+        messages = [recommendations]
+    else:
+        messages = list(recommendations)
+
+    speak_sequence(messages)
 
 
 # ============================================================
