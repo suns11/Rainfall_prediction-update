@@ -1542,6 +1542,18 @@ if st.session_state.theme == "dark":
 }
 .result-card h1, .result-card h2, .result-card h3, .result-card p { color: #6FD39A !important; }
 
+/* radio / checkbox / toggle option text (was dark-on-dark) */
+[data-testid="stMain"] [data-testid="stRadio"] label,
+[data-testid="stMain"] [data-testid="stRadio"] label *,
+[data-testid="stMain"] [data-testid="stRadio"] [data-testid="stMarkdownContainer"] p,
+[data-testid="stMain"] [data-testid="stCheckbox"] label,
+[data-testid="stMain"] [data-testid="stCheckbox"] label *,
+[data-testid="stMain"] [data-testid="stToggle"] label,
+[data-testid="stMain"] [data-testid="stToggle"] label * {
+    color: #E6EDF3 !important;
+    opacity: 1 !important;
+}
+
 hr { border-color: #263545 !important; }
 
 /* footer */
