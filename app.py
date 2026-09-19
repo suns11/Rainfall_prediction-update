@@ -1542,16 +1542,36 @@ if st.session_state.theme == "dark":
 }
 .result-card h1, .result-card h2, .result-card h3, .result-card p { color: #6FD39A !important; }
 
-/* radio / checkbox / toggle option text (was dark-on-dark) */
-[data-testid="stMain"] [data-testid="stRadio"] label,
-[data-testid="stMain"] [data-testid="stRadio"] label *,
-[data-testid="stMain"] [data-testid="stRadio"] [data-testid="stMarkdownContainer"] p,
-[data-testid="stMain"] [data-testid="stCheckbox"] label,
-[data-testid="stMain"] [data-testid="stCheckbox"] label *,
-[data-testid="stMain"] [data-testid="stToggle"] label,
-[data-testid="stMain"] [data-testid="stToggle"] label * {
+/* ---------------------------------------------------------
+   DARK MODE TEXT FIX (radio / checkbox / toggle / labels / tabs)
+   :not(#x) adds ID-level specificity, so this wins over any
+   class/attribute based colour rule (including page CSS).
+--------------------------------------------------------- */
+[data-testid="stMain"] [data-testid="stRadio"]:not(#x) label:not(#x),
+[data-testid="stMain"] [data-testid="stRadio"]:not(#x) label:not(#x) *,
+[data-testid="stMain"] [data-testid="stRadio"]:not(#x) p:not(#x),
+[data-testid="stMain"] [data-testid="stRadio"]:not(#x) span:not(#x),
+[data-testid="stMain"] [data-testid="stRadio"]:not(#x) div:not(#x),
+[data-testid="stMain"] [data-testid="stCheckbox"]:not(#x) label:not(#x),
+[data-testid="stMain"] [data-testid="stCheckbox"]:not(#x) label:not(#x) *,
+[data-testid="stMain"] [data-testid="stToggle"]:not(#x) label:not(#x),
+[data-testid="stMain"] [data-testid="stToggle"]:not(#x) label:not(#x) *,
+[data-testid="stMain"] [data-testid="stWidgetLabel"]:not(#x),
+[data-testid="stMain"] [data-testid="stWidgetLabel"]:not(#x) *,
+[data-testid="stMain"] button[role="tab"]:not(#x) p:not(#x),
+[data-testid="stMain"] [data-testid="stCaptionContainer"]:not(#x),
+[data-testid="stMain"] [data-testid="stCaptionContainer"]:not(#x) * {
     color: #E6EDF3 !important;
+    -webkit-text-fill-color: #E6EDF3 !important;
     opacity: 1 !important;
+    filter: none !important;
+}
+
+/* radio dot: keep the teal accent when selected */
+[data-testid="stMain"] [data-testid="stRadio"]:not(#x) label:not(#x):has(input:checked) p:not(#x) {
+    color: #7FE0D2 !important;
+    -webkit-text-fill-color: #7FE0D2 !important;
+    font-weight: 600 !important;
 }
 
 hr { border-color: #263545 !important; }
