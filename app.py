@@ -1593,6 +1593,88 @@ hr { border-color: #263545 !important; }
 
 
 # ============================================================
+# RADIO OPTION BOXES (all radio buttons in main area)
+# Hover highlight + selected highlight. CSS only, no logic change.
+# ============================================================
+
+if st.session_state.theme == "dark":
+    RB = {
+        "bg": "#16212E",
+        "border": "#33475A",
+        "hover_bg": "#1F3446",
+        "hover_border": "#55D6C2",
+        "sel_bg": "rgba(85,214,194,0.14)",
+        "sel_border": "#55D6C2",
+        "shadow": "rgba(0,0,0,0.35)",
+    }
+else:
+    RB = {
+        "bg": "#FFFFFF",
+        "border": "#D5DEE7",
+        "hover_bg": "#E8F7F5",
+        "hover_border": "#168F87",
+        "sel_bg": "#E8F7F5",
+        "sel_border": "#168F87",
+        "shadow": "rgba(22,143,135,0.18)",
+    }
+
+RADIO_BOX_CSS = """
+<style>
+
+[data-testid="stMain"] [data-testid="stRadio"]:not(#x) div[role="radiogroup"]:not(#x) {
+    gap: 0.55rem !important;
+}
+
+/* each option = a box */
+[data-testid="stMain"] [data-testid="stRadio"]:not(#x) div[role="radiogroup"]:not(#x) > label:not(#x) {
+    background: __BG__ !important;
+    border: 1.5px solid __BORDER__ !important;
+    border-radius: 12px !important;
+    padding: 0.75rem 1rem !important;
+    margin: 0 !important;
+    cursor: pointer !important;
+    transition: background 0.18s ease, border-color 0.18s ease,
+                box-shadow 0.18s ease, transform 0.18s ease !important;
+}
+
+/* mouse over -> highlight */
+[data-testid="stMain"] [data-testid="stRadio"]:not(#x) div[role="radiogroup"]:not(#x) > label:not(#x):hover {
+    background: __HOVER_BG__ !important;
+    border-color: __HOVER_BORDER__ !important;
+    box-shadow: 0 4px 14px __SHADOW__ !important;
+    transform: translateY(-1px) !important;
+}
+
+/* selected option */
+[data-testid="stMain"] [data-testid="stRadio"]:not(#x) div[role="radiogroup"]:not(#x) > label:not(#x):has(input:checked) {
+    background: __SEL_BG__ !important;
+    border-color: __SEL_BORDER__ !important;
+    box-shadow: 0 0 0 1px __SEL_BORDER__ !important;
+}
+
+/* keyboard focus */
+[data-testid="stMain"] [data-testid="stRadio"]:not(#x) div[role="radiogroup"]:not(#x) > label:not(#x):focus-within {
+    border-color: __HOVER_BORDER__ !important;
+}
+
+</style>
+"""
+
+for _k, _v in {
+    "__BG__": RB["bg"],
+    "__BORDER__": RB["border"],
+    "__HOVER_BG__": RB["hover_bg"],
+    "__HOVER_BORDER__": RB["hover_border"],
+    "__SEL_BG__": RB["sel_bg"],
+    "__SEL_BORDER__": RB["sel_border"],
+    "__SHADOW__": RB["shadow"],
+}.items():
+    RADIO_BOX_CSS = RADIO_BOX_CSS.replace(_k, _v)
+
+st.markdown(RADIO_BOX_CSS, unsafe_allow_html=True)
+
+
+# ============================================================
 # UPDATE PAGE
 # ============================================================
 
