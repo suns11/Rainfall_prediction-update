@@ -123,6 +123,18 @@ def clean_voice_text(text):
     )
 
     # --------------------------------------------------------
+    # EMPTY BRACKETS
+    # --------------------------------------------------------
+    # English বাদ দেওয়ার পর "( )" পড়ে থাকে।
+    # gTTS-এ এগুলো অপ্রয়োজনীয় বিরতি তৈরি করে।
+
+    text = re.sub(
+        r"\(\s*\)",
+        " ",
+        text
+    )
+
+    # --------------------------------------------------------
     # NORMALIZE SPACES
     # --------------------------------------------------------
 
@@ -154,7 +166,7 @@ def _english_digits_to_bangla(text):
 
 def _prepare_voice_text(text):
     """
-    Voice-এর আগে English বাদ দিয়ে Bangla text তৈরি করে।
+    Voice-এর আগে English বাদ দিয়ে Bangla text তৈরি করে।
     """
 
     text = clean_voice_text(text)
@@ -181,7 +193,7 @@ def _prepare_voice_text(text):
 
 def _generate_audio(text):
     """
-    gTTS দিয়ে Bangla MP3 তৈরি করে।
+    gTTS দিয়ে Bangla MP3 তৈরি করে।
     """
 
     clean_text = _prepare_voice_text(text)
@@ -205,6 +217,8 @@ def _generate_audio(text):
         return audio_buffer.getvalue()
 
     except Exception:
+        # Internet না থাকলে অথবা gTTS fail করলে
+        # UI যেন crash না করে।
         return None
 
 
@@ -217,10 +231,10 @@ def speak_sequence(messages, delay=0.0):
     একাধিক voice message sequentially handle করে।
 
     Agriculture Result Card-এর জন্য:
-        - একই সময়ে অনেক voice trigger হবে না
+        - একই সময়ে অনেক voice trigger হবে না
         - সব message একসাথে একটি Bangla audio-তে যাবে
         - English UI words বাদ যাবে
-        - duplicate audio regeneration এড়ানো হবে
+        - duplicate audio regeneration এড়ানো হবে
     """
 
     _init_voice_state()
@@ -265,34 +279,69 @@ def speak_sequence(messages, delay=0.0):
 
 
 # ============================================================
+# RESET VOICE HASH
+# ============================================================
+
+def reset_voice_hash():
+    """
+    Duplicate-guard clear করে।
+
+    একই text আবার বাজাতে হলে (যেমন Calculate বা
+    Smart Recommendation বাটনে দ্বিতীয়বার চাপ দিলে)
+    speak_sequence() আগের hash দেখে চুপ করে থাকত।
+    এই helper সেই hash মুছে দেয়।
+
+    আগে page থেকে সরাসরি
+        st.session_state["voice_hash"] = None
+    লেখা হতো। এখন সেটি এখানে কেন্দ্রীভূত।
+    """
+
+    _init_voice_state()
+
+    st.session_state["voice_hash"] = None
+
+
+# ============================================================
 # GROWTH STAGE VOICE
 # ============================================================
 
-def growth_stage_auto_voice(stage_label):
-    """Announce the automatically detected growth stage first."""
+def growth_stage_auto_voice(
+    stage_label,
+    next_instruction="মাটির ধরন নির্বাচন করুন"
+):
+    """
+    Automatic growth stage announce করে, তারপর একটু বিরতি দিয়ে
+    পরবর্তী ধাপের instruction বলে।
+
+    কেন বিরতি:
+    কৃষক যদি বৃদ্ধি পর্যায় না বদলায়, তবুও voice flow যেন থেমে
+    না যায়। আগে এখানে flow থেমে যেত — কৃষক stage select না করলে
+    পরের কোনো instruction বাজত না।
+
+    PAUSE_TOKEN ("।") gTTS-এ একটি ছোট বিরতি তৈরি করে।
+    তিনটি token ≈ ২-৩ সেকেন্ড বিরতি দেয়।
+    """
+
     if not stage_label:
         return
 
-    speak_sequence([
-        f"স্বয়ংক্রিয়ভাবে আপনার ফসলের পর্যায় নির্ধারণ করা হয়েছে {stage_label}।",
-        "আপনি চাইলে নিচের বৃদ্ধি পর্যায় থেকে অন্য পর্যায় নির্বাচন করতে পারেন।"
-    ], delay=0.10)
+    PAUSE_TOKEN = "।"
 
+    messages = [
+        f"স্বয়ংক্রিয়ভাবে আপনার ফসলের পর্যায় নির্ধারণ করা হয়েছে {stage_label}।",
+        "আপনি চাইলে উপরের বৃদ্ধি পর্যায় থেকে অন্য পর্যায় নির্বাচন করতে পারেন।"
+    ]
 
-# ============================================================
-# AGRICULTURE RECOMMENDATION VOICE
-# ============================================================
+    if next_instruction:
 
-def agriculture_recommendation_voice(recommendations):
-    if not recommendations:
-        return
+        messages.extend([
+            PAUSE_TOKEN,
+            PAUSE_TOKEN,
+            PAUSE_TOKEN,
+            next_instruction
+        ])
 
-    if isinstance(recommendations, str):
-        messages = [recommendations]
-    else:
-        messages = list(recommendations)
-
-    speak_sequence(messages)
+    speak_sequence(messages, delay=0.10)
 
 
 # ============================================================
@@ -312,7 +361,7 @@ def agriculture_result_voice(
     Agriculture Result Card-এর জন্য farmer-friendly main voice।
 
     Voice-এ technical calculation যেমন ET0, Kc, formula ইত্যাদি
-    বলা হবে না। শুধু farmer-এর জন্য প্রয়োজনীয় সিদ্ধান্ত বলা হবে।
+    বলা হবে না। শুধু farmer-এর জন্য প্রয়োজনীয় সিদ্ধান্ত বলা হবে।
     """
 
     messages = []
@@ -324,17 +373,17 @@ def agriculture_result_voice(
     if irrigation_needed:
 
         messages.append(
-            f"আজ আপনার জমিতে সেচ প্রয়োজন। "
-            f"প্রায় {water_liters:.0f} লিটার পানি "
+            f"আজ আপনার জমিতে সেচ প্রয়োজন। "
+            f"প্রায় {water_liters:.0f} লিটার পানি "
             f"অথবা {gross_irrigation:.1f} মিলিমিটার সেচ দিতে হবে।"
         )
 
     else:
 
         messages.append(
-            "আজ আপনার জমিতে অতিরিক্ত সেচ দেওয়ার প্রয়োজন নেই। "
+            "আজ আপনার জমিতে অতিরিক্ত সেচ দেওয়ার প্রয়োজন নেই। "
             "জমিতে থাকা পানি এবং বৃষ্টির পানি "
-            "বর্তমান প্রয়োজন মেটাতে যথেষ্ট।"
+            "বর্তমান প্রয়োজন মেটাতে যথেষ্ট।"
         )
 
     # --------------------------------------------------------
@@ -346,13 +395,14 @@ def agriculture_result_voice(
         messages.append(
             f"জমিতে থাকা পানি {available_water:.1f} মিলিমিটার "
             f"এবং কার্যকর বৃষ্টির পানি {effective_rain:.1f} মিলিমিটার। "
-            f"সব বাদ দেওয়ার পর পানির ঘাটতি "
+            f"সব বাদ দেওয়ার পর পানির ঘাটতি "
             f"{net_irrigation:.1f} মিলিমিটার।"
         )
 
     # --------------------------------------------------------
     # 3. NO RAIN DECISION
     # --------------------------------------------------------
+    # এই message result card-এও হুবহু লেখা দেখানো হয়।
 
     if no_rain_message:
         messages.append(no_rain_message)
@@ -362,6 +412,12 @@ def agriculture_result_voice(
 
 # ============================================================
 # SMART RECOMMENDATION VOICE
+# ============================================================
+#
+# NOTE:
+# আগের ফাইলে এই function দুইবার define করা ছিল।
+# Python দ্বিতীয়টিকেই রাখত, প্রথমটি চুপচাপ overwrite হয়ে যেত।
+# এখন একটিই রাখা হয়েছে।
 # ============================================================
 
 def agriculture_recommendation_voice(recommendations):

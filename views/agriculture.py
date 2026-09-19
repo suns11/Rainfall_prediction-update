@@ -19,7 +19,8 @@ from services.voice import (
     agriculture_recommendation_voice,
     growth_stage_auto_voice,
     render_voice_player,
-    process_voice_queue
+    process_voice_queue,
+    reset_voice_hash
 )
 
 
@@ -52,7 +53,7 @@ AGRICULTURE_WELCOME_TEXT = (
     "আসসালামু আলাইকুম। "
     "স্মার্ট কৃষি পরামর্শ সিস্টেমে স্বাগতম। "
     "ফসলের তথ্য দিন। "
-    "প্রয়োজনীয় সেচ ও কৃষি পরামর্শ পান।"
+    "প্রয়োজনীয় সেচ ও কৃষি পরামর্শ পান।"
 )
 
 
@@ -62,7 +63,7 @@ def start_agriculture_welcome():
     1. প্রথমে Welcome voice
     2. Welcome শেষ হলে "বৃষ্টির তথ্যের উৎস নির্বাচন করুন"
 
-    অন্য কোনো input-এর voice page load-এর সময় বাজবে না।
+    অন্য কোনো input-এর voice page load-এর সময় বাজবে না।
     """
 
     if st.session_state.get(
@@ -85,6 +86,261 @@ def start_agriculture_welcome():
             "বৃষ্টির তথ্যের উৎস নির্বাচন করুন"
         ],
         delay=0.10
+    )
+
+
+# ============================================================
+# PAGE STYLES  (BOX / CARD UI)
+# ============================================================
+#
+# IMPORTANT:
+# Streamlit প্রতিটি rerun-এ পুরো script আবার চালায় এবং
+# আগের DOM মুছে ফেলে। তাই এই CSS প্রতিবার inject করতে হবে।
+# session_state দিয়ে "একবার only" guard দিলে প্রথম run-এর পর
+# box style হারিয়ে যাবে।
+# ============================================================
+
+def inject_agriculture_styles():
+
+    st.markdown(
+        """
+        <style>
+
+        /* ============================================================
+           IMPORTANT SCOPING NOTE
+
+           সব radio rule শুধুমাত্র main content area-তে প্রয়োগ হবে
+           ( section[data-testid="stMain"] )।
+
+           আগে scope ছাড়া লেখা ছিল বলে sidebar navigation-এর radio-ও
+           সাদা box হয়ে যেত এবং সাদা লেখা সাদা background-এ মিশে
+           অদৃশ্য হয়ে যেত।
+           ============================================================ */
+
+
+        /* ---------- RADIO OPTION → BOX (MAIN AREA ONLY) ---------- */
+
+        section[data-testid="stMain"]
+        div[data-testid="stRadio"] div[role="radiogroup"] {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-top: 6px;
+        }
+
+        section[data-testid="stMain"]
+        div[data-testid="stRadio"] div[role="radiogroup"] > label {
+            border: 2px solid #d5dee7;
+            border-radius: 12px;
+            padding: 14px 16px;
+            background: #ffffff;
+            width: 100%;
+            cursor: pointer;
+            transition: border-color .15s ease,
+                        background-color .15s ease;
+        }
+
+        section[data-testid="stMain"]
+        div[data-testid="stRadio"] div[role="radiogroup"] > label:hover {
+            border-color: #0e9f6e;
+            background: #f4fbf8;
+        }
+
+        section[data-testid="stMain"]
+        div[data-testid="stRadio"] div[role="radiogroup"] > label:has(input:checked) {
+            border-color: #0e9f6e;
+            background: #e8f9f1;
+        }
+
+        section[data-testid="stMain"]
+        div[data-testid="stRadio"] div[role="radiogroup"] > label:focus-within {
+            outline: 2px solid #0e9f6e;
+            outline-offset: 2px;
+        }
+
+        section[data-testid="stMain"]
+        div[data-testid="stRadio"] div[role="radiogroup"] label p {
+            font-size: 16px !important;
+            font-weight: 600 !important;
+            color: #102a43 !important;
+            margin: 0 !important;
+        }
+
+        section[data-testid="stMain"]
+        div[data-testid="stRadio"] > label p {
+            font-size: 17px !important;
+            font-weight: 700 !important;
+        }
+
+
+        /* ============================================================
+           SIDEBAR NAVIGATION
+           ============================================================ */
+
+        section[data-testid="stSidebar"] {
+            background: linear-gradient(180deg, #0d1b2a 0%, #102a43 100%);
+            border-right: 1px solid rgba(255,255,255,.06);
+        }
+
+        section[data-testid="stSidebar"] h1,
+        section[data-testid="stSidebar"] h2,
+        section[data-testid="stSidebar"] h3,
+        section[data-testid="stSidebar"] p,
+        section[data-testid="stSidebar"] label,
+        section[data-testid="stSidebar"] span {
+            color: #e6edf3 !important;
+        }
+
+        section[data-testid="stSidebar"] h1 {
+            font-size: 20px !important;
+            font-weight: 700 !important;
+            letter-spacing: .2px;
+            padding-bottom: 6px;
+            border-bottom: 1px solid rgba(255,255,255,.08);
+        }
+
+        /* Nav list */
+        section[data-testid="stSidebar"]
+        div[data-testid="stRadio"] div[role="radiogroup"] {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        /* Nav item → pill */
+        section[data-testid="stSidebar"]
+        div[data-testid="stRadio"] div[role="radiogroup"] > label {
+            background: transparent;
+            border: 1px solid transparent;
+            border-left: 3px solid transparent;
+            border-radius: 8px;
+            padding: 10px 12px;
+            width: 100%;
+            cursor: pointer;
+            transition: background-color .15s ease,
+                        border-color .15s ease;
+        }
+
+        section[data-testid="stSidebar"]
+        div[data-testid="stRadio"] div[role="radiogroup"] > label:hover {
+            background: rgba(255,255,255,.06);
+        }
+
+        section[data-testid="stSidebar"]
+        div[data-testid="stRadio"] div[role="radiogroup"] > label:has(input:checked) {
+            background: rgba(14,159,110,.16);
+            border-left-color: #0e9f6e;
+        }
+
+        section[data-testid="stSidebar"]
+        div[data-testid="stRadio"] div[role="radiogroup"] label p {
+            color: #cdd9e5 !important;
+            font-size: 15px !important;
+            font-weight: 500 !important;
+            margin: 0 !important;
+        }
+
+        section[data-testid="stSidebar"]
+        div[data-testid="stRadio"] div[role="radiogroup"] > label:has(input:checked) p {
+            color: #ffffff !important;
+            font-weight: 600 !important;
+        }
+
+        /* Nav-এ radio dot লুকানো — pill navigation-এ dot দরকার নেই */
+        section[data-testid="stSidebar"]
+        div[data-testid="stRadio"] div[role="radiogroup"] > label > div:first-child {
+            display: none !important;
+        }
+
+        section[data-testid="stSidebar"] hr {
+            border-color: rgba(255,255,255,.08);
+        }
+
+
+        /* ============================================================
+           MAIN AREA WIDGETS
+           ============================================================ */
+
+        section[data-testid="stMain"] div[data-testid="stNumberInput"] label p,
+        section[data-testid="stMain"] div[data-testid="stSelectbox"] label p,
+        section[data-testid="stMain"] div[data-testid="stDateInput"] label p,
+        section[data-testid="stMain"] div[data-testid="stTextInput"] label p,
+        section[data-testid="stMain"] div[data-testid="stSlider"] label p {
+            font-size: 15px !important;
+            font-weight: 600 !important;
+        }
+
+        /* Placeholder text একটু নরম রঙে */
+        section[data-testid="stMain"] input::placeholder {
+            color: #8a9aa8 !important;
+            opacity: 1 !important;
+        }
+
+        /* ---------- FIELD CARD (st.container(border=True)) ---------- */
+
+        section[data-testid="stMain"]
+        div[data-testid="stVerticalBlockBorderWrapper"] {
+            border-radius: 14px !important;
+            background: #ffffff;
+        }
+
+        /* ---------- SECTION TITLE ---------- */
+
+        .section-title {
+            font-size: 20px;
+            font-weight: 700;
+            border-left: 5px solid #0e9f6e;
+            padding-left: 12px;
+            margin: 22px 0 12px 0;
+        }
+
+        /* ---------- RESULT CARD ---------- */
+
+        .result-card {
+            border-radius: 16px;
+            padding: 20px 22px;
+            background: linear-gradient(135deg, #0e9f6e 0%, #0b7f59 100%);
+            color: #ffffff;
+            margin: 6px 0 14px 0;
+        }
+
+        .result-card h2 {
+            color: #ffffff;
+            margin: 0 0 4px 0;
+            font-size: 26px;
+        }
+
+        .result-card h3 {
+            color: rgba(255,255,255,.85);
+            margin: 0;
+            font-size: 16px;
+            font-weight: 500;
+        }
+
+        /* ---------- HEADER CARD ---------- */
+
+        .agri-card {
+            border-radius: 14px;
+            padding: 16px 18px;
+            background: #eef6f2;
+            border: 1px solid #cfe6db;
+            margin-bottom: 8px;
+        }
+
+        .agri-card h3 {
+            margin: 0 0 6px 0;
+            font-size: 18px;
+        }
+
+        .agri-card p {
+            margin: 0;
+            font-size: 15px;
+            line-height: 1.7;
+        }
+
+        </style>
+        """,
+        unsafe_allow_html=True
     )
 
 
@@ -129,8 +385,8 @@ def bn_num(
 # ============================================================
 
 BANGLA_MONTHS = {
-    1: "জানুয়ারি",
-    2: "ফেব্রুয়ারি",
+    1: "জানুয়ারি",
+    2: "ফেব্রুয়ারি",
     3: "মার্চ",
     4: "এপ্রিল",
     5: "মে",
@@ -373,42 +629,42 @@ def _voice_value_text(key, value):
 
             return (
                 f"জমির পরিমাণ "
-                f"{number_text} দেওয়া হয়েছে"
+                f"{number_text} দেওয়া হয়েছে"
             )
 
         if "rain" in key:
 
             return (
                 f"বৃষ্টির পরিমাণ "
-                f"{number_text} দেওয়া হয়েছে"
+                f"{number_text} দেওয়া হয়েছে"
             )
 
         if "et0" in key:
 
             return (
                 f"রেফারেন্স বাষ্পীভবনের পরিমাণ "
-                f"{number_text} দেওয়া হয়েছে"
+                f"{number_text} দেওয়া হয়েছে"
             )
 
         if key == "agriculture_custom_water_depth":
 
             return (
                 f"পানির গভীরতা "
-                f"{number_text} সেন্টিমিটার দেওয়া হয়েছে"
+                f"{number_text} সেন্টিমিটার দেওয়া হয়েছে"
             )
 
         if key == "agriculture_manual_crop_water_need":
 
             return (
                 f"ফসলের পানির চাহিদা "
-                f"{number_text} দেওয়া হয়েছে"
+                f"{number_text} দেওয়া হয়েছে"
             )
 
         if key == "agriculture_irrigation_efficiency":
 
             return (
                 f"সেচ দক্ষতা "
-                f"{number_text} শতাংশ নির্বাচন করা হয়েছে"
+                f"{number_text} শতাংশ নির্বাচন করা হয়েছে"
             )
 
 
@@ -423,12 +679,12 @@ def _voice_value_text(key, value):
 
             return (
                 f"হিসাবের তারিখ "
-                f"{value_text} নির্বাচন করা হয়েছে"
+                f"{value_text} নির্বাচন করা হয়েছে"
             )
 
         return (
             f"রোপণ বা বপনের তারিখ "
-            f"{value_text} নির্বাচন করা হয়েছে"
+            f"{value_text} নির্বাচন করা হয়েছে"
         )
 
 
@@ -444,25 +700,25 @@ def _voice_value_text(key, value):
     if key == "agriculture_weather_source":
 
         return (
-            f"{text} নির্বাচন করা হয়েছে"
+            f"{text} নির্বাচন করা হয়েছে"
         )
 
     if key == "agriculture_area_unit":
 
         return (
-            f"{text} নির্বাচন করা হয়েছে"
+            f"{text} নির্বাচন করা হয়েছে"
         )
 
     if key == "agriculture_crop_select":
 
         return (
-            f"{text} নির্বাচন করা হয়েছে"
+            f"{text} নির্বাচন করা হয়েছে"
         )
 
     if key == "agriculture_season_select":
 
         return (
-            f"{text} মৌসুম নির্বাচন করা হয়েছে"
+            f"{text} মৌসুম নির্বাচন করা হয়েছে"
         )
 
     if key.startswith(
@@ -470,47 +726,47 @@ def _voice_value_text(key, value):
     ):
 
         return (
-            f"{text} নির্বাচন করা হয়েছে"
+            f"{text} নির্বাচন করা হয়েছে"
         )
 
     if key == "agriculture_soil_type":
 
         return (
-            f"{text} নির্বাচন করা হয়েছে"
+            f"{text} নির্বাচন করা হয়েছে"
         )
 
     if key == "agriculture_water_measurement":
 
         return (
-            f"{text} নির্বাচন করা হয়েছে"
+            f"{text} নির্বাচন করা হয়েছে"
         )
 
     if key == "agriculture_water_requirement_method":
 
         return (
-            f"{text} নির্বাচন করা হয়েছে"
+            f"{text} নির্বাচন করা হয়েছে"
         )
 
     if key == "agriculture_irrigation_method":
 
         return (
-            f"{text} নির্বাচন করা হয়েছে"
+            f"{text} নির্বাচন করা হয়েছে"
         )
 
     if key == "agriculture_reference_period":
 
         return (
-            f"{text} নির্বাচন করা হয়েছে"
+            f"{text} নির্বাচন করা হয়েছে"
         )
 
     if key == "agriculture_out_of_season_stage":
 
         return (
-            f"{text} নির্বাচন করা হয়েছে"
+            f"{text} নির্বাচন করা হয়েছে"
         )
 
     return (
-        f"{text} নির্বাচন করা হয়েছে"
+        f"{text} নির্বাচন করা হয়েছে"
     )
 
 
@@ -523,7 +779,7 @@ VOICE_NEXT_INSTRUCTION = {
     # WEATHER FLOW
     # --------------------------------------------------------
 
-    # Weather source select করার পর সরাসরি Land Area নয়।
+    # Weather source select করার পর সরাসরি Land Area নয়।
     # Manual rainfall হলে আগে rainfall -> ET0 complete হবে.
     "agriculture_weather_source": "",
 
@@ -577,13 +833,14 @@ VOICE_NEXT_INSTRUCTION = {
     "agriculture_actual_planting_date":
         "",
 
-    # Automatic stage নিজে voice announce করবে।
-    # তাই callback থেকে আবার next instruction দেওয়া হবে না।
+    # Growth stage নির্বাচনের পর পরবর্তী ধাপ মাটির ধরন।
+    # Automatic announcement-ও শেষে এই একই instruction বলে,
+    # তাই কৃষক stage না বদলালেও flow থেমে থাকে না।
     "agriculture_growth_stage":
-        "",
+        "মাটির ধরন নির্বাচন করুন",
 
     "agriculture_growth_stage_fallback":
-        "",
+        "মাটির ধরন নির্বাচন করুন",
 
     "agriculture_out_of_season_stage":
         "",
@@ -690,7 +947,7 @@ def input_voice_callback(
     )
 
 
-    # Same value হলে আবার voice নয়
+    # Same value হলে আবার voice নয়
     if previous == value:
 
         return
@@ -763,46 +1020,42 @@ def input_voice_callback(
 def weather_information_section():
 
     section_title(
-        "আবহাওয়া ও বৃষ্টির তথ্য",
+        "আবহাওয়া ও বৃষ্টির তথ্য",
         "Weather & Rainfall Information"
     )
 
 
-    st.markdown(
-        """
-        <style>
-        div[data-testid="stRadio"] label p {
-            font-size: 16px !important;
-            font-weight: 600 !important;
-        }
-        </style>
-        """,
-        unsafe_allow_html=True
-    )
+    # --------------------------------------------------------
+    # RAINFALL SOURCE  (BOX)
+    # --------------------------------------------------------
 
+    with st.container(border=True):
 
-    weather_source = st.radio(
-        "বৃষ্টির তথ্যের উৎস (Rainfall Source)",
-        [
-            "বৃষ্টির পূর্বাভাস ব্যবহার করুন (Use Rain Prediction)",
-            "নিজে বৃষ্টির পরিমাণ দিন (Manual Rainfall Input)"
-        ],
-        index=None,
-        key="agriculture_weather_source",
-        on_change=input_voice_callback,
-        args=(
-            "agriculture_weather_source",
-            "বৃষ্টির তথ্যের উৎস নির্বাচন করুন",
-            None
+        weather_source = st.radio(
+            "বৃষ্টির তথ্যের উৎস (Rainfall Source)",
+            [
+                "বৃষ্টির পূর্বাভাস ব্যবহার করুন (Use Rain Prediction)",
+                "নিজে বৃষ্টির পরিমাণ দিন (Manual Rainfall Input)"
+            ],
+            index=None,
+            key="agriculture_weather_source",
+            on_change=input_voice_callback,
+            args=(
+                "agriculture_weather_source",
+                "বৃষ্টির তথ্যের উৎস নির্বাচন করুন",
+                None
+            )
         )
-    )
+
+
+        if weather_source is None:
+
+            st.info(
+                "উপরের যেকোনো একটি বক্স নির্বাচন করুন।"
+            )
 
 
     if weather_source is None:
-
-        st.info(
-            "বৃষ্টির তথ্যের উৎস নির্বাচন করুন।"
-        )
 
         return None, 0.0, 0.0
 
@@ -854,23 +1107,25 @@ def weather_information_section():
                 et0_value = 4.0
 
 
-            st.success(
-                f"""
-                বৃষ্টির পূর্বাভাস:
-                {bn_num(predicted_rain, 2)} mm
+            with st.container(border=True):
 
-                ET0:
-                {bn_num(et0_value, 2)} mm/day
-                """
-            )
+                st.success(
+                    f"""
+                    বৃষ্টির পূর্বাভাস:
+                    {bn_num(predicted_rain, 2)} mm
+
+                    ET0:
+                    {bn_num(et0_value, 2)} mm/day
+                    """
+                )
 
 
             # =================================================
             # PREDICTION WEATHER VOICE
             # =================================================
             #
-            # Prediction থেকে Rainfall এবং ET0 পাওয়া গেলে
-            # কোনো manual input নেওয়া হবে না।
+            # Prediction থেকে Rainfall এবং ET0 পাওয়া গেলে
+            # কোনো manual input নেওয়া হবে না।
             #
             # Voice flow:
             #
@@ -882,7 +1137,7 @@ def weather_information_section():
             #       ↓
             # Land Area
             #
-            # Signature ব্যবহার করা হয়েছে যাতে Streamlit rerun-এর
+            # Signature ব্যবহার করা হয়েছে যাতে Streamlit rerun-এর
             # কারণে একই prediction voice বারবার না বাজে।
             # =================================================
 
@@ -933,11 +1188,56 @@ def weather_information_section():
 
         else:
 
-            st.warning(
-                "আগে Rain Prediction করুন অথবা "
-                "নিজে বৃষ্টির পরিমাণ দিন নির্বাচন করুন।"
-            )
+            with st.container(border=True):
 
+                st.warning(
+                    "আগে Rain Prediction করুন অথবা "
+                    "নিজে বৃষ্টির পরিমাণ দিন নির্বাচন করুন।"
+                )
+
+
+                c1, c2 = st.columns(2)
+
+
+                predicted_rain = c1.number_input(
+                    "আজকের বৃষ্টির পরিমাণ "
+                    "(Today's Rainfall) mm",
+                    min_value=0.0,
+                    value=0.0,
+                    step=0.5,
+                    key="agriculture_prediction_fallback_rain",
+                    on_change=input_voice_callback,
+                    args=(
+                        "agriculture_prediction_fallback_rain",
+                        "আজকের বৃষ্টির পরিমাণ দিন",
+                        None
+                    )
+                )
+
+
+                et0_value = c2.number_input(
+                    "রেফারেন্স বাষ্পীভবন "
+                    "(ET0 / Reference Evapotranspiration) mm/day",
+                    min_value=0.0,
+                    value=4.0,
+                    step=0.1,
+                    key="agriculture_prediction_fallback_et0",
+                    on_change=input_voice_callback,
+                    args=(
+                        "agriculture_prediction_fallback_et0",
+                        "রেফারেন্স বাষ্পীভবনের পরিমাণ দিন",
+                        None
+                    )
+                )
+
+
+    # ========================================================
+    # MANUAL
+    # ========================================================
+
+    else:
+
+        with st.container(border=True):
 
             c1, c2 = st.columns(2)
 
@@ -948,10 +1248,10 @@ def weather_information_section():
                 min_value=0.0,
                 value=0.0,
                 step=0.5,
-                key="agriculture_prediction_fallback_rain",
+                key="agriculture_manual_rain",
                 on_change=input_voice_callback,
                 args=(
-                    "agriculture_prediction_fallback_rain",
+                    "agriculture_manual_rain",
                     "আজকের বৃষ্টির পরিমাণ দিন",
                     None
                 )
@@ -964,55 +1264,14 @@ def weather_information_section():
                 min_value=0.0,
                 value=4.0,
                 step=0.1,
-                key="agriculture_prediction_fallback_et0",
+                key="agriculture_manual_et0",
                 on_change=input_voice_callback,
                 args=(
-                    "agriculture_prediction_fallback_et0",
+                    "agriculture_manual_et0",
                     "রেফারেন্স বাষ্পীভবনের পরিমাণ দিন",
                     None
                 )
             )
-
-
-    # ========================================================
-    # MANUAL
-    # ========================================================
-
-    else:
-
-        c1, c2 = st.columns(2)
-
-
-        predicted_rain = c1.number_input(
-            "আজকের বৃষ্টির পরিমাণ "
-            "(Today's Rainfall) mm",
-            min_value=0.0,
-            value=0.0,
-            step=0.5,
-            key="agriculture_manual_rain",
-            on_change=input_voice_callback,
-            args=(
-                "agriculture_manual_rain",
-                "আজকের বৃষ্টির পরিমাণ দিন",
-                None
-            )
-        )
-
-
-        et0_value = c2.number_input(
-            "রেফারেন্স বাষ্পীভবন "
-            "(ET0 / Reference Evapotranspiration) mm/day",
-            min_value=0.0,
-            value=4.0,
-            step=0.1,
-            key="agriculture_manual_et0",
-            on_change=input_voice_callback,
-            args=(
-                "agriculture_manual_et0",
-                "রেফারেন্স বাষ্পীভবনের পরিমাণ দিন",
-                None
-            )
-        )
 
 
     return (
@@ -1034,40 +1293,63 @@ def land_information_section():
     )
 
 
-    c1, c2 = st.columns(2)
+    with st.container(border=True):
+
+        c1, c2 = st.columns(2)
 
 
-    land_area = c1.number_input(
-        "জমির পরিমাণ (Land Area)",
-        min_value=0.01,
-        value=1.0,
-        step=0.01,
-        key="agriculture_land_area",
-        on_change=input_voice_callback,
-        args=(
-            "agriculture_land_area",
-            "জমির পরিমাণ দিন",
-            None
+        # ----------------------------------------------------
+        # LAND AREA
+        # ----------------------------------------------------
+        # value=None দিলে box খালি থাকে এবং ভিতরে placeholder
+        # লেখা দেখায় — ঠিক "ফসল নির্বাচন করুন" এর মতো।
+        # কৃষক সংখ্যা দিলে তখনই value বসে।
+
+        land_area = c1.number_input(
+            "জমির পরিমাণ (Land Area)",
+            min_value=0.01,
+            value=None,
+            step=0.01,
+            placeholder="জমির পরিমাণ লিখুন",
+            key="agriculture_land_area",
+            on_change=input_voice_callback,
+            args=(
+                "agriculture_land_area",
+                "জমির পরিমাণ দিন",
+                None
+            )
         )
-    )
 
 
-    area_unit = c2.selectbox(
-        "জমির একক (Area Unit)",
-        [
-            "শতক (Decimal)",
-            "একর (Acre)",
-            "হেক্টর (Hectare)",
-            "বর্গমিটার (Square Meter)"
-        ],
-        key="agriculture_area_unit",
-        on_change=input_voice_callback,
-        args=(
-            "agriculture_area_unit",
-            "জমির একক নির্বাচন করুন",
-            None
+        # ----------------------------------------------------
+        # AREA UNIT
+        # ----------------------------------------------------
+
+        area_unit = c2.selectbox(
+            "জমির একক (Area Unit)",
+            [
+                "শতক (Decimal)",
+                "একর (Acre)",
+                "হেক্টর (Hectare)",
+                "বর্গমিটার (Square Meter)"
+            ],
+            index=None,
+            placeholder="জমির একক নির্বাচন করুন",
+            key="agriculture_area_unit",
+            on_change=input_voice_callback,
+            args=(
+                "agriculture_area_unit",
+                "জমির একক নির্বাচন করুন",
+                None
+            )
         )
-    )
+
+
+        if land_area is None or area_unit is None:
+
+            st.info(
+                "জমির পরিমাণ লিখুন এবং একক নির্বাচন করুন।"
+            )
 
 
     return (
@@ -1092,44 +1374,7 @@ def crop_information_section():
     if not crop_options:
 
         st.error(
-            "Crop reference dataset পাওয়া যায়নি।"
-        )
-
-        return (
-            None,
-            None,
-            None,
-            None,
-            True
-        )
-
-    c1, c2 = st.columns(2)
-
-
-    # ========================================================
-    # CROP
-    # ========================================================
-
-    crop_label = c1.selectbox(
-        "ফসল নির্বাচন করুন (Select Crop)",
-        list(crop_options.keys()),
-        index=None,
-        placeholder="ফসল নির্বাচন করুন",
-        key="agriculture_crop_select",
-        on_change=input_voice_callback,
-        args=(
-            "agriculture_crop_select",
-            "ফসল নির্বাচন করুন",
-            None
-        )
-    )
-
-
-    # Nothing else is rendered until a crop is actually selected.
-    if crop_label is None:
-
-        st.info(
-            "উপরের বক্সে একটি ফসল নির্বাচন করুন।"
+            "Crop reference dataset পাওয়া যায়নি।"
         )
 
         return (
@@ -1141,98 +1386,142 @@ def crop_information_section():
         )
 
 
-    previous_crop = st.session_state.get(
-        "agriculture_previous_crop"
-    )
+    # --------------------------------------------------------
+    # CROP + SEASON  (BOX)
+    # --------------------------------------------------------
+
+    with st.container(border=True):
+
+        c1, c2 = st.columns(2)
 
 
-    crop_changed = (
-        previous_crop is not None
-        and previous_crop != crop_label
-    )
+        # ====================================================
+        # CROP
+        # ====================================================
 
-
-    # A crop change makes the old season invalid.
-    if crop_changed:
-
-        st.session_state.pop(
-            "agriculture_season_select",
-            None
-        )
-
-        st.session_state.pop(
-            "agriculture_interaction_voice_agriculture_season_select",
-            None
-        )
-
-
-    st.session_state[
-        "agriculture_previous_crop"
-    ] = crop_label
-
-
-    crop_name = crop_options[
-        crop_label
-    ]
-
-
-    # ========================================================
-    # SEASON
-    # ========================================================
-
-    season_options = get_season_options(
-        crop_name
-    )
-
-
-    if not season_options:
-
-        st.error(
-            "এই ফসলের Season data পাওয়া যায়নি।"
-        )
-
-        return (
-            crop_label,
-            crop_name,
-            None,
-            None,
-            True
+        crop_label = c1.selectbox(
+            "ফসল নির্বাচন করুন (Select Crop)",
+            list(crop_options.keys()),
+            index=None,
+            placeholder="ফসল নির্বাচন করুন",
+            key="agriculture_crop_select",
+            on_change=input_voice_callback,
+            args=(
+                "agriculture_crop_select",
+                "ফসল নির্বাচন করুন",
+                None
+            )
         )
 
 
-    season_label = c2.selectbox(
-        "মৌসুম নির্বাচন করুন (Select Season)",
-        list(season_options.keys()),
-        index=None,
-        placeholder="মৌসুম নির্বাচন করুন",
-        key="agriculture_season_select",
-        on_change=input_voice_callback,
-        args=(
-            "agriculture_season_select",
-            "মৌসুম নির্বাচন করুন",
-            None
-        )
-    )
+        # Nothing else is rendered until a crop is actually selected.
+        if crop_label is None:
+
+            st.info(
+                "উপরের বক্সে একটি ফসল নির্বাচন করুন।"
+            )
+
+            return (
+                None,
+                None,
+                None,
+                None,
+                True
+            )
 
 
-    if season_label is None:
-
-        st.info(
-            "মৌসুম নির্বাচন করুন।"
-        )
-
-        return (
-            crop_label,
-            crop_name,
-            None,
-            None,
-            True
+        previous_crop = st.session_state.get(
+            "agriculture_previous_crop"
         )
 
 
-    season_name = season_options[
-        season_label
-    ]
+        crop_changed = (
+            previous_crop is not None
+            and previous_crop != crop_label
+        )
+
+
+        # A crop change makes the old season invalid.
+        if crop_changed:
+
+            st.session_state.pop(
+                "agriculture_season_select",
+                None
+            )
+
+            st.session_state.pop(
+                "agriculture_interaction_voice_agriculture_season_select",
+                None
+            )
+
+
+        st.session_state[
+            "agriculture_previous_crop"
+        ] = crop_label
+
+
+        crop_name = crop_options[
+            crop_label
+        ]
+
+
+        # ====================================================
+        # SEASON
+        # ====================================================
+
+        season_options = get_season_options(
+            crop_name
+        )
+
+
+        if not season_options:
+
+            st.error(
+                "এই ফসলের Season data পাওয়া যায়নি।"
+            )
+
+            return (
+                crop_label,
+                crop_name,
+                None,
+                None,
+                True
+            )
+
+
+        season_label = c2.selectbox(
+            "মৌসুম নির্বাচন করুন (Select Season)",
+            list(season_options.keys()),
+            index=None,
+            placeholder="মৌসুম নির্বাচন করুন",
+            key="agriculture_season_select",
+            on_change=input_voice_callback,
+            args=(
+                "agriculture_season_select",
+                "মৌসুম নির্বাচন করুন",
+                None
+            )
+        )
+
+
+        if season_label is None:
+
+            st.info(
+                "মৌসুম নির্বাচন করুন।"
+            )
+
+            return (
+                crop_label,
+                crop_name,
+                None,
+                None,
+                True
+            )
+
+
+        season_name = season_options[
+            season_label
+        ]
 
 
     return (
@@ -1254,38 +1543,54 @@ def planting_growth_section(
 ):
 
     section_title(
-        "রোপণ/বপন ও বৃদ্ধির পর্যায়",
+        "রোপণ/বপন ও বৃদ্ধির পর্যায়",
         "Planting & Growth Stage"
     )
 
 
-    calculation_date = st.date_input(
-        "হিসাবের তারিখ (Calculation Date)",
-        value=None,
-        format="YYYY/MM/DD",
-        key="agriculture_calculation_date",
-        on_change=input_voice_callback,
-        args=(
-            "agriculture_calculation_date",
-            "হিসাবের তারিখ নির্বাচন করুন",
-            None
-        )
-    )
+    with st.container(border=True):
+
+        d1, d2 = st.columns(2)
 
 
-    actual_planting_date = st.date_input(
-        "রোপণ/বপনের তারিখ "
-        "(Planting / Sowing Date)",
-        value=None,
-        format="YYYY/MM/DD",
-        key="agriculture_actual_planting_date",
-        on_change=input_voice_callback,
-        args=(
-            "agriculture_actual_planting_date",
-            "রোপণ বা বপনের তারিখ নির্বাচন করুন",
-            None
+        calculation_date = d1.date_input(
+            "হিসাবের তারিখ (Calculation Date)",
+            value=None,
+            format="YYYY/MM/DD",
+            key="agriculture_calculation_date",
+            on_change=input_voice_callback,
+            args=(
+                "agriculture_calculation_date",
+                "হিসাবের তারিখ নির্বাচন করুন",
+                None
+            )
         )
-    )
+
+
+        actual_planting_date = d2.date_input(
+            "রোপণ/বপনের তারিখ "
+            "(Planting / Sowing Date)",
+            value=None,
+            format="YYYY/MM/DD",
+            key="agriculture_actual_planting_date",
+            on_change=input_voice_callback,
+            args=(
+                "agriculture_actual_planting_date",
+                "রোপণ বা বপনের তারিখ নির্বাচন করুন",
+                None
+            )
+        )
+
+
+        if (
+            calculation_date is None
+            or actual_planting_date is None
+        ):
+
+            st.info(
+                "হিসাবের তারিখ এবং রোপণ/বপনের তারিখ নির্বাচন করুন। "
+                "ক্যালেন্ডার থেকে নির্বাচন করতে পারেন অথবা তারিখ লিখতে পারেন।"
+            )
 
 
     use_actual_planting = True
@@ -1295,11 +1600,6 @@ def planting_growth_section(
         calculation_date is None
         or actual_planting_date is None
     ):
-
-        st.info(
-            "হিসাবের তারিখ এবং রোপণ/বপনের তারিখ নির্বাচন করুন। "
-            "ক্যালেন্ডার থেকে নির্বাচন করতে পারেন অথবা তারিখ লিখতে পারেন।"
-        )
 
         return (
             calculation_date,
@@ -1315,8 +1615,8 @@ def planting_growth_section(
 
 
     st.caption(
-        "ফসলের বয়স ও বৃদ্ধি পর্যায় "
-        "রোপণ/বপনের তারিখ থেকে স্বয়ংক্রিয়ভাবে হিসাব করা হবে।"
+        "ফসলের বয়স ও বৃদ্ধি পর্যায় "
+        "রোপণ/বপনের তারিখ থেকে স্বয়ংক্রিয়ভাবে হিসাব করা হবে।"
     )
 
 
@@ -1337,7 +1637,7 @@ def planting_growth_section(
     # STAGE AVAILABLE
     # ========================================================
 
-    if stage_info["available"]:
+    if stage_info.get("available"):
 
         automatic_stage = (
             stage_info["stage"]
@@ -1379,149 +1679,157 @@ def planting_growth_section(
             )
 
 
-        c1, c2 = st.columns(2)
+        with st.container(border=True):
 
-
-        manual_stage_label = c1.selectbox(
-            "বর্তমান বৃদ্ধি পর্যায় "
-            "(Growth Stage)",
-            [
-                "স্বয়ংক্রিয় (Automatic)",
-                "চারা/প্রাথমিক পর্যায় (Initial Stage)",
-                "বৃদ্ধি পর্যায় (Development Stage)",
-                "মধ্য পর্যায় (Mid Stage)",
-                "পরিপক্বতা পর্যায় (Late Stage)"
-            ],
-            key="agriculture_growth_stage",
-            on_change=input_voice_callback,
-            args=(
-                "agriculture_growth_stage",
-                "বর্তমান বৃদ্ধি পর্যায় নির্বাচন করুন",
-                None
+            st.markdown(
+                f"""
+                <div style="font-size:16px; font-weight:600; margin:0 0 10px 0;">
+                    স্বয়ংক্রিয়ভাবে নির্ধারিত পর্যায়:
+                    {stage_info.get('stage_label', automatic_stage)}
+                </div>
+                """,
+                unsafe_allow_html=True
             )
-        )
 
 
-        stage_map = {
-
-            "স্বয়ংক্রিয় (Automatic)":
-                automatic_stage,
-
-            "চারা/প্রাথমিক পর্যায় (Initial Stage)":
-                "Initial",
-
-            "বৃদ্ধি পর্যায় (Development Stage)":
-                "Development",
-
-            "মধ্য পর্যায় (Mid Stage)":
-                "Mid",
-
-            "পরিপক্বতা পর্যায় (Late Stage)":
-                "Late"
-        }
+            c1, c2 = st.columns(2)
 
 
-        crop_stage = stage_map[
-            manual_stage_label
-        ]
-
-
-        c2.info(
-            f"""
-            ফসলের বয়স
-
-            {bn_num(
-                stage_info['day_of_crop'],
-                0
-            )}
-            দিন /
-
-            {bn_num(
-                stage_info['duration_days'],
-                0
-            )}
-            দিন
-            """
-        )
-
-
-        st.markdown(
-            f"""
-            <div style="font-size:16px; font-weight:600; margin:10px 0 8px 0;">
-                স্বয়ংক্রিয়ভাবে নির্ধারিত পর্যায়: {stage_info['stage_label']}
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
-
-
-        st.caption(
-            "আপনি চাইলে নিচের বৃদ্ধি পর্যায় থেকে অন্য পর্যায় নির্বাচন করতে পারেন।"
-        )
-
-
-        st.success(
-            stage_info["message"]
-        )
-
-
-        if stage_info.get("warning"):
-
-            st.warning(
-                stage_info["warning"]
+            manual_stage_label = c1.selectbox(
+                "বর্তমান বৃদ্ধি পর্যায় "
+                "(Growth Stage)",
+                [
+                    "স্বয়ংক্রিয় (Automatic)",
+                    "চারা/প্রাথমিক পর্যায় (Initial Stage)",
+                    "বৃদ্ধি পর্যায় (Development Stage)",
+                    "মধ্য পর্যায় (Mid Stage)",
+                    "পরিপক্বতা পর্যায় (Late Stage)"
+                ],
+                key="agriculture_growth_stage",
+                on_change=input_voice_callback,
+                args=(
+                    "agriculture_growth_stage",
+                    "বর্তমান বৃদ্ধি পর্যায় নির্বাচন করুন",
+                    None
+                )
             )
+
+
+            stage_map = {
+
+                "স্বয়ংক্রিয় (Automatic)":
+                    automatic_stage,
+
+                "চারা/প্রাথমিক পর্যায় (Initial Stage)":
+                    "Initial",
+
+                "বৃদ্ধি পর্যায় (Development Stage)":
+                    "Development",
+
+                "মধ্য পর্যায় (Mid Stage)":
+                    "Mid",
+
+                "পরিপক্বতা পর্যায় (Late Stage)":
+                    "Late"
+            }
+
+
+            crop_stage = stage_map[
+                manual_stage_label
+            ]
+
+
+            c2.info(
+                f"""
+                ফসলের বয়স
+
+                {bn_num(
+                    stage_info.get('day_of_crop'),
+                    0
+                )}
+                দিন /
+
+                {bn_num(
+                    stage_info.get('duration_days'),
+                    0
+                )}
+                দিন
+                """
+            )
+
+
+            st.caption(
+                "আপনি চাইলে উপরের বৃদ্ধি পর্যায় থেকে "
+                "অন্য পর্যায় নির্বাচন করতে পারেন।"
+            )
+
+
+            if stage_info.get("message"):
+
+                st.success(
+                    stage_info["message"]
+                )
+
+
+            if stage_info.get("warning"):
+
+                st.warning(
+                    stage_info["warning"]
+                )
 
 
     # ========================================================
     # OUT OF SEASON
     # ========================================================
 
-    elif stage_info["status"] == "OUT_OF_SEASON":
+    elif stage_info.get("status") == "OUT_OF_SEASON":
 
         calculation_allowed = False
 
 
-        c1, c2 = st.columns(2)
+        with st.container(border=True):
+
+            c1, c2 = st.columns(2)
 
 
-        c1.text_input(
-            "ফসলের বৃদ্ধি পর্যায় "
-            "(Crop Growth Stage)",
-            value="মৌসুমের বাইরে (Out of Season)",
-            disabled=True,
-            key="agriculture_out_of_season_stage"
-        )
+            c1.text_input(
+                "ফসলের বৃদ্ধি পর্যায় "
+                "(Crop Growth Stage)",
+                value="মৌসুমের বাইরে (Out of Season)",
+                disabled=True,
+                key="agriculture_out_of_season_stage"
+            )
 
 
-        reference_period = (
-            f"{date_text(stage_info.get('reference_start_date'))}"
-            f" → "
-            f"{date_text(stage_info.get('reference_end_date'))}"
-        )
+            reference_period = (
+                f"{date_text(stage_info.get('reference_start_date'))}"
+                f" → "
+                f"{date_text(stage_info.get('reference_end_date'))}"
+            )
 
 
-        c2.text_input(
-            "রেফারেন্স ফসলের সময়কাল "
-            "(Reference Crop Period)",
-            value=reference_period,
-            disabled=True,
-            key="agriculture_reference_period"
-        )
+            c2.text_input(
+                "রেফারেন্স ফসলের সময়কাল "
+                "(Reference Crop Period)",
+                value=reference_period,
+                disabled=True,
+                key="agriculture_reference_period"
+            )
 
 
-        st.error(
-            "নির্বাচিত হিসাবের তারিখটি এই ফসলের "
-            "reference growing season-এর বাইরে। "
-            "মৌসুমের মধ্যে একটি তারিখ নির্বাচন করুন "
-            "অথবা কৃষকের প্রকৃত রোপণ/বপনের তারিখ ব্যবহার করুন।"
-        )
+            st.error(
+                "নির্বাচিত হিসাবের তারিখটি এই ফসলের "
+                "reference growing season-এর বাইরে। "
+                "মৌসুমের মধ্যে একটি তারিখ নির্বাচন করুন "
+                "অথবা কৃষকের প্রকৃত রোপণ/বপনের তারিখ ব্যবহার করুন।"
+            )
 
 
     # ========================================================
     # INVALID / FUTURE / COMPLETE
     # ========================================================
 
-    elif stage_info["status"] in [
+    elif stage_info.get("status") in [
         "FUTURE_PLANTING_DATE",
         "CROP_CYCLE_COMPLETE",
         "INVALID_PLANTING_DATE"
@@ -1531,7 +1839,10 @@ def planting_growth_section(
 
 
         st.error(
-            stage_info["message"]
+            stage_info.get(
+                "message",
+                "রোপণ/বপনের তারিখ সঠিক নয়। আবার নির্বাচন করুন।"
+            )
         )
 
 
@@ -1541,59 +1852,76 @@ def planting_growth_section(
 
     else:
 
-        st.warning(
-            stage_info["message"]
-        )
+        with st.container(border=True):
 
-
-        manual_stage_label = st.selectbox(
-            "বর্তমান বৃদ্ধি পর্যায় "
-            "(Growth Stage)",
-            [
-                "স্বয়ংক্রিয় (Automatic)",
-                "চারা/প্রাথমিক পর্যায় (Initial Stage)",
-                "বৃদ্ধি পর্যায় (Development Stage)",
-                "মধ্য পর্যায় (Mid Stage)",
-                "পরিপক্বতা পর্যায় (Late Stage)"
-            ],
-            key="agriculture_growth_stage_fallback",
-            on_change=input_voice_callback,
-            args=(
-                "agriculture_growth_stage_fallback",
-                "বর্তমান বৃদ্ধি পর্যায় নির্বাচন করুন",
-                None
+            st.warning(
+                stage_info.get(
+                    "message",
+                    "Calendar data অসম্পূর্ণ।"
+                )
             )
-        )
 
 
-        stage_map = {
-
-            "স্বয়ংক্রিয় (Automatic)":
-                crop_stage,
-
-            "চারা/প্রাথমিক পর্যায় (Initial Stage)":
-                "Initial",
-
-            "বৃদ্ধি পর্যায় (Development Stage)":
-                "Development",
-
-            "মধ্য পর্যায় (Mid Stage)":
-                "Mid",
-
-            "পরিপক্বতা পর্যায় (Late Stage)":
-                "Late"
-        }
-
-
-        crop_stage = stage_map[
-            manual_stage_label
-        ]
+            manual_stage_label = st.selectbox(
+                "বর্তমান বৃদ্ধি পর্যায় "
+                "(Growth Stage)",
+                [
+                    "চারা/প্রাথমিক পর্যায় (Initial Stage)",
+                    "বৃদ্ধি পর্যায় (Development Stage)",
+                    "মধ্য পর্যায় (Mid Stage)",
+                    "পরিপক্বতা পর্যায় (Late Stage)"
+                ],
+                index=None,
+                placeholder="বৃদ্ধি পর্যায় নির্বাচন করুন",
+                key="agriculture_growth_stage_fallback",
+                on_change=input_voice_callback,
+                args=(
+                    "agriculture_growth_stage_fallback",
+                    "বর্তমান বৃদ্ধি পর্যায় নির্বাচন করুন",
+                    None
+                )
+            )
 
 
-        st.caption(
-            "Calendar data অসম্পূর্ণ হওয়ায় "
-            "Growth Stage manualভাবে নির্বাচন করা হচ্ছে।"
-        )
+            stage_map = {
+
+                "চারা/প্রাথমিক পর্যায় (Initial Stage)":
+                    "Initial",
+
+                "বৃদ্ধি পর্যায় (Development Stage)":
+                    "Development",
+
+                "মধ্য পর্যায় (Mid Stage)":
+                    "Mid",
+
+                "পরিপক্বতা পর্যায় (Late Stage)":
+                    "Late"
+            }
+
+
+            # Calendar data না থাকায় "স্বয়ংক্রিয়" option রাখা হয়নি।
+            # আগে Automatic নিলে crop_stage None হয়ে যেত এবং
+            # get_kc() / calculate_irrigation() fail করত।
+
+            crop_stage = stage_map.get(
+                manual_stage_label
+            )
+
+
+            if crop_stage is None:
+
+                calculation_allowed = False
+
+                st.info(
+                    "Calendar data অসম্পূর্ণ। "
+                    "হিসাব করার আগে বৃদ্ধি পর্যায় নির্বাচন করুন।"
+                )
+
+
+            st.caption(
+                "Calendar data অসম্পূর্ণ হওয়ায় "
+                "Growth Stage manualভাবে নির্বাচন করা হচ্ছে।"
+            )
 
 
     return (
@@ -1647,7 +1975,7 @@ def crop_reference_section(
         ) is not None:
 
             st.write(
-                f"রেফারেন্স সময়কাল "
+                f"রেফারেন্স সময়কাল "
                 f"(Reference Duration): "
                 f"{bn_num(crop_reference['duration_days'], 0)} দিন"
             )
@@ -1677,7 +2005,7 @@ def crop_reference_section(
 
         st.caption(
             "নোট: CWR/IWR এখানে seasonal reference। "
-            "এগুলো আজকের daily irrigation requirement নয়।"
+            "এগুলো আজকের daily irrigation requirement নয়।"
         )
 
 
@@ -1693,28 +2021,30 @@ def soil_information_section():
     )
 
 
-    soil_type = st.selectbox(
-        "মাটির ধরন (Soil Type)",
-        list(SOIL_TYPES.keys()),
-        key="agriculture_soil_type",
-        on_change=input_voice_callback,
-        args=(
-            "agriculture_soil_type",
-            "মাটির ধরন নির্বাচন করুন",
-            None
+    with st.container(border=True):
+
+        soil_type = st.selectbox(
+            "মাটির ধরন (Soil Type)",
+            list(SOIL_TYPES.keys()),
+            key="agriculture_soil_type",
+            on_change=input_voice_callback,
+            args=(
+                "agriculture_soil_type",
+                "মাটির ধরন নির্বাচন করুন",
+                None
+            )
         )
-    )
 
 
-    st.caption(
-        SOIL_TYPES[soil_type]["description"]
-    )
+        st.caption(
+            SOIL_TYPES[soil_type]["description"]
+        )
 
 
-    st.caption(
-        "নোট: মাটির ধরন তথ্য ও পরামর্শের জন্য ব্যবহার করা হচ্ছে। "
-        "সেচের পরিমাণে কোনো arbitrary soil multiplier প্রয়োগ করা হচ্ছে না।"
-    )
+        st.caption(
+            "নোট: মাটির ধরন তথ্য ও পরামর্শের জন্য ব্যবহার করা হচ্ছে। "
+            "সেচের পরিমাণে কোনো arbitrary soil multiplier প্রয়োগ করা হচ্ছে না।"
+        )
 
 
     return soil_type
@@ -1738,54 +2068,56 @@ def existing_water_section(
     st.info(
         """
         জমিতে কত মিলিমিটার পানি আছে তা সরাসরি জানা কঠিন।
-        তাই আপনি আঙুল দিয়ে পানির গভীরতা মাপতে পারেন।
+        তাই আপনি আঙুল দিয়ে পানির গভীরতা মাপতে পারেন।
         সিস্টেম সেই পরিমাপকে আনুমানিক মিলিমিটারে পরিবর্তন করবে।
         এটি একটি আনুমানিক হিসাব।
         """
     )
 
 
-    water_measurement = st.selectbox(
-        "পানির গভীরতা নির্বাচন করুন "
-        "(Select Water Depth)",
-        list(WATER_DEPTH_OPTIONS.keys())
-        +
-        [
-            "নিজে পরিমাপ দিন "
-            "(Custom Measurement)"
-        ],
-        key="agriculture_water_measurement",
-        on_change=input_voice_callback,
-        args=(
-            "agriculture_water_measurement",
-            "পানির গভীরতা নির্বাচন করুন",
-            None
-        )
-    )
+    with st.container(border=True):
 
-
-    custom_depth_cm = 0.0
-
-
-    if water_measurement == (
-        "নিজে পরিমাপ দিন "
-        "(Custom Measurement)"
-    ):
-
-        custom_depth_cm = st.number_input(
-            "পানির গভীরতা সেন্টিমিটারে দিন "
-            "(Water Depth in cm)",
-            min_value=0.0,
-            value=0.0,
-            step=0.5,
-            key="agriculture_custom_water_depth",
+        water_measurement = st.selectbox(
+            "পানির গভীরতা নির্বাচন করুন "
+            "(Select Water Depth)",
+            list(WATER_DEPTH_OPTIONS.keys())
+            +
+            [
+                "নিজে পরিমাপ দিন "
+                "(Custom Measurement)"
+            ],
+            key="agriculture_water_measurement",
             on_change=input_voice_callback,
             args=(
-                "agriculture_custom_water_depth",
-                "পানির গভীরতা সেন্টিমিটারে দিন",
+                "agriculture_water_measurement",
+                "পানির গভীরতা নির্বাচন করুন",
                 None
             )
         )
+
+
+        custom_depth_cm = 0.0
+
+
+        if water_measurement == (
+            "নিজে পরিমাপ দিন "
+            "(Custom Measurement)"
+        ):
+
+            custom_depth_cm = st.number_input(
+                "পানির গভীরতা সেন্টিমিটারে দিন "
+                "(Water Depth in cm)",
+                min_value=0.0,
+                value=0.0,
+                step=0.5,
+                key="agriculture_custom_water_depth",
+                on_change=input_voice_callback,
+                args=(
+                    "agriculture_custom_water_depth",
+                    "পানির গভীরতা সেন্টিমিটারে দিন",
+                    None
+                )
+            )
 
 
     existing_water_mm = (
@@ -1816,35 +2148,37 @@ def existing_water_section(
     )
 
 
-    a, b, c = st.columns(3)
+    with st.container(border=True):
+
+        a, b, c = st.columns(3)
 
 
-    a.metric(
-        "আনুমানিক পানির গভীরতা "
-        "(Estimated Water Depth)",
-        f"{bn_num(existing_water_mm, 1)} mm"
-    )
+        a.metric(
+            "আনুমানিক পানির গভীরতা "
+            "(Estimated Water Depth)",
+            f"{bn_num(existing_water_mm, 1)} mm"
+        )
 
 
-    b.metric(
-        "আনুমানিক মোট পানি "
-        "(Estimated Total Water)",
-        f"{bn_num(existing_water_volume['water_liters'], 0, True)} L"
-    )
+        b.metric(
+            "আনুমানিক মোট পানি "
+            "(Estimated Total Water)",
+            f"{bn_num(existing_water_volume['water_liters'], 0, True)} L"
+        )
 
 
-    c.metric(
-        "আনুমানিক পানির পরিমাণ "
-        "(Estimated Water Volume)",
-        f"{bn_num(existing_water_volume['water_m3'], 2)} m³"
-    )
+        c.metric(
+            "আনুমানিক পানির পরিমাণ "
+            "(Estimated Water Volume)",
+            f"{bn_num(existing_water_volume['water_m3'], 2)} m³"
+        )
 
 
-    st.caption(
-        "নোট: আঙুল দিয়ে মাপার কারণে এটি আনুমানিক হিসাব। "
-        "বিশেষ করে ধানের ক্ষেত্রে দৃশ্যমান standing water "
-        "এবং root-zone available water এক জিনিস নয়।"
-    )
+        st.caption(
+            "নোট: আঙুল দিয়ে মাপার কারণে এটি আনুমানিক হিসাব। "
+            "বিশেষ করে ধানের ক্ষেত্রে দৃশ্যমান standing water "
+            "এবং root-zone available water এক জিনিস নয়।"
+        )
 
 
     return (
@@ -1877,10 +2211,16 @@ def crop_water_requirement_section(
 
     if crop_stage is not None:
 
-        kc_preview = get_kc(
-            crop_name,
-            crop_stage
-        )
+        try:
+
+            kc_preview = get_kc(
+                crop_name,
+                crop_stage
+            )
+
+        except Exception:
+
+            kc_preview = None
 
 
         if kc_preview is not None:
@@ -1898,68 +2238,79 @@ def crop_water_requirement_section(
 
     if automatic_etc_preview is not None:
 
-        a, b, c = st.columns(3)
+        with st.container(border=True):
+
+            a, b, c = st.columns(3)
 
 
-        a.metric(
-            "ET0 "
-            "(Reference Evapotranspiration)",
-            f"{bn_num(et0_value, 2)} mm/day"
-        )
-
-
-        b.metric(
-            "ফসল সহগ "
-            "(Crop Coefficient / Kc)",
-            f"{bn_num(kc_preview['kc'], 2)}"
-        )
-
-
-        c.metric(
-            "দৈনিক ফসলের পানির চাহিদা "
-            "(Daily Crop Water Need / ETc)",
-            f"{bn_num(automatic_etc_preview, 2)} mm/day"
-        )
-
-
-        if predicted_rain <= 0:
-
-            st.warning(
-                f"""
-                আজ বৃষ্টি না হলেও এই ফসলের বর্তমান stage অনুযায়ী
-                আনুমানিক {bn_num(automatic_etc_preview, 2)} mm/day
-                পানি প্রয়োজন। জমিতে পর্যাপ্ত পানি না থাকলে
-                সেচ প্রয়োজন হতে পারে।
-                """
+            a.metric(
+                "ET0 "
+                "(Reference Evapotranspiration)",
+                f"{bn_num(et0_value, 2)} mm/day"
             )
 
 
-    water_requirement_method = st.radio(
-        "পানির চাহিদা নির্ধারণের পদ্ধতি "
-        "(Water Requirement Method)",
-        [
-            "স্বয়ংক্রিয়ভাবে পানির চাহিদা নির্ধারণ করুন "
-            "(Automatic — Recommended)",
+            b.metric(
+                "ফসল সহগ "
+                "(Crop Coefficient / Kc)",
+                f"{bn_num(kc_preview['kc'], 2)}"
+            )
 
-            "নিজে দৈনিক পানির চাহিদা দিন "
-            "(Manual Override)"
-        ],
-        index=None,
-        key="agriculture_water_requirement_method",
-        on_change=input_voice_callback,
-        args=(
-            "agriculture_water_requirement_method",
-            "পানির চাহিদা নির্ধারণের পদ্ধতি নির্বাচন করুন",
-            None
+
+            c.metric(
+                "দৈনিক ফসলের পানির চাহিদা "
+                "(Daily Crop Water Need / ETc)",
+                f"{bn_num(automatic_etc_preview, 2)} mm/day"
+            )
+
+
+            if predicted_rain <= 0:
+
+                st.warning(
+                    f"""
+                    আজ বৃষ্টি না হলেও এই ফসলের বর্তমান stage অনুযায়ী
+                    আনুমানিক {bn_num(automatic_etc_preview, 2)} mm/day
+                    পানি প্রয়োজন। জমিতে পর্যাপ্ত পানি না থাকলে
+                    সেচ প্রয়োজন হতে পারে।
+                    """
+                )
+
+
+    # ========================================================
+    # METHOD  (BOX)
+    # ========================================================
+
+    with st.container(border=True):
+
+        water_requirement_method = st.radio(
+            "পানির চাহিদা নির্ধারণের পদ্ধতি "
+            "(Water Requirement Method)",
+            [
+                "স্বয়ংক্রিয়ভাবে পানির চাহিদা নির্ধারণ করুন "
+                "(Automatic — Recommended)",
+
+                "নিজে দৈনিক পানির চাহিদা দিন "
+                "(Manual Override)"
+            ],
+            index=None,
+            key="agriculture_water_requirement_method",
+            on_change=input_voice_callback,
+            args=(
+                "agriculture_water_requirement_method",
+                "পানির চাহিদা নির্ধারণের পদ্ধতি নির্বাচন করুন",
+                None
+            )
         )
-    )
+
+
+        if water_requirement_method is None:
+
+            st.info(
+                "উপরের যেকোনো একটি বক্স নির্বাচন করুন।"
+            )
 
 
     if water_requirement_method is None:
-
-        st.info(
-            "পানির চাহিদা নির্ধারণের পদ্ধতি নির্বাচন করুন।"
-        )
 
         return (
             kc_preview,
@@ -1983,27 +2334,42 @@ def crop_water_requirement_section(
         )
 
 
-        manual_crop_water_need_mm = st.number_input(
-            "দৈনিক ফসলের পানির চাহিদা "
-            "(Daily Crop Water Requirement) mm/day",
-            min_value=0.0,
-            value=default_manual_need,
-            step=0.1,
-            key="agriculture_manual_crop_water_need",
-            on_change=input_voice_callback,
-            args=(
-                "agriculture_manual_crop_water_need",
-                "দৈনিক ফসলের পানির চাহিদা দিন",
-                None
+        with st.container(border=True):
+
+            # NOTE:
+            # key already in session state হলে Streamlit value=
+            # উপেক্ষা করে। তাই প্রথমবার default বসানো হচ্ছে।
+
+            if (
+                "agriculture_manual_crop_water_need"
+                not in st.session_state
+            ):
+
+                st.session_state[
+                    "agriculture_manual_crop_water_need"
+                ] = default_manual_need
+
+
+            manual_crop_water_need_mm = st.number_input(
+                "দৈনিক ফসলের পানির চাহিদা "
+                "(Daily Crop Water Requirement) mm/day",
+                min_value=0.0,
+                step=0.1,
+                key="agriculture_manual_crop_water_need",
+                on_change=input_voice_callback,
+                args=(
+                    "agriculture_manual_crop_water_need",
+                    "দৈনিক ফসলের পানির চাহিদা দিন",
+                    None
+                )
             )
-        )
 
 
-        st.warning(
-            "Manual Override ব্যবহার করলে irrigation calculation "
-            "আপনার দেওয়া daily crop water requirement অনুযায়ী হবে। "
-            "Automatic ET0 × Kc value reference হিসেবে উপরে দেখানো থাকবে."
-        )
+            st.warning(
+                "Manual Override ব্যবহার করলে irrigation calculation "
+                "আপনার দেওয়া daily crop water requirement অনুযায়ী হবে। "
+                "Automatic ET0 × Kc value reference হিসেবে উপরে দেখানো থাকবে।"
+            )
 
 
     return (
@@ -2026,60 +2392,90 @@ def irrigation_system_section():
     )
 
 
-    irrigation_method = st.selectbox(
-        "সেচ পদ্ধতি নির্বাচন করুন "
-        "(Select Irrigation Method)",
-        [
-            "সাধারণ সেচ (Traditional Irrigation)",
-            "স্প্রিংকলার (Sprinkler)",
-            "ড্রিপ সেচ (Drip Irrigation)"
-        ],
-        key="agriculture_irrigation_method",
-        on_change=input_voice_callback,
-        args=(
-            "agriculture_irrigation_method",
-            "সেচ পদ্ধতি নির্বাচন করুন",
-            None
+    with st.container(border=True):
+
+        irrigation_method = st.selectbox(
+            "সেচ পদ্ধতি নির্বাচন করুন "
+            "(Select Irrigation Method)",
+            [
+                "সাধারণ সেচ (Traditional Irrigation)",
+                "স্প্রিংকলার (Sprinkler)",
+                "ড্রিপ সেচ (Drip Irrigation)"
+            ],
+            key="agriculture_irrigation_method",
+            on_change=input_voice_callback,
+            args=(
+                "agriculture_irrigation_method",
+                "সেচ পদ্ধতি নির্বাচন করুন",
+                None
+            )
         )
-    )
 
 
-    if irrigation_method.startswith(
-        "সাধারণ"
-    ):
+        if irrigation_method.startswith(
+            "সাধারণ"
+        ):
 
-        default_efficiency = 60
+            default_efficiency = 60
 
-    elif irrigation_method.startswith(
-        "স্প্রিংকলার"
-    ):
+        elif irrigation_method.startswith(
+            "স্প্রিংকলার"
+        ):
 
-        default_efficiency = 75
+            default_efficiency = 75
 
-    else:
+        else:
 
-        default_efficiency = 90
+            default_efficiency = 90
 
 
-    irrigation_efficiency = st.slider(
-        "সেচ দক্ষতা (Irrigation Efficiency %)",
-        min_value=30,
-        max_value=100,
-        value=default_efficiency,
-        key="agriculture_irrigation_efficiency",
-        on_change=input_voice_callback,
-        args=(
-            "agriculture_irrigation_efficiency",
-            "সেচ দক্ষতা নির্বাচন করুন",
-            None
+        # ----------------------------------------------------
+        # EFFICIENCY AUTO UPDATE
+        # ----------------------------------------------------
+        # slider-এ key থাকলে Streamlit session value ব্যবহার করে
+        # এবং value= সম্পূর্ণ উপেক্ষা করে। তাই সেচ পদ্ধতি বদলালেও
+        # আগের percentage আটকে থাকত (৬০ → ড্রিপ নিলেও ৬০)।
+        #
+        # সমাধান: slider তৈরি হওয়ার আগেই session value বসানো।
+        # widget instantiate হওয়ার আগে session state লেখা বৈধ।
+
+        method_signature_key = (
+            "agriculture_efficiency_method_signature"
         )
-    )
+
+        if (
+            st.session_state.get(method_signature_key)
+            != irrigation_method
+        ):
+
+            st.session_state[
+                method_signature_key
+            ] = irrigation_method
+
+            st.session_state[
+                "agriculture_irrigation_efficiency"
+            ] = default_efficiency
 
 
-    st.caption(
-        "নোট: Default efficiency values planning assumption হিসেবে "
-        "ব্যবহৃত হচ্ছে। প্রয়োজন হলে field condition অনুযায়ী slider পরিবর্তন করুন."
-    )
+        irrigation_efficiency = st.slider(
+            "সেচ দক্ষতা (Irrigation Efficiency %)",
+            min_value=30,
+            max_value=100,
+            key="agriculture_irrigation_efficiency",
+            on_change=input_voice_callback,
+            args=(
+                "agriculture_irrigation_efficiency",
+                "সেচ দক্ষতা নির্বাচন করুন",
+                None
+            )
+        )
+
+
+        st.caption(
+            "নোট: Default efficiency values planning assumption হিসেবে "
+            "ব্যবহৃত হচ্ছে। প্রয়োজন হলে field condition অনুযায়ী "
+            "slider পরিবর্তন করুন।"
+        )
 
 
     return (
@@ -2119,6 +2515,12 @@ def _agriculture_input_panel():
         land_area,
         area_unit
     ) = land_information_section()
+
+
+    # জমির পরিমাণ/একক ছাড়া convert_area_to_m2() কাজ করবে না।
+    if land_area is None or area_unit is None:
+
+        return
 
 
     # ========================================================
@@ -2228,6 +2630,35 @@ def _agriculture_input_panel():
 
 
     # ========================================================
+    # CALCULATION GUARDS
+    # ========================================================
+    #
+    # পদ্ধতি বা বৃদ্ধি পর্যায় নির্বাচন না করলে calculate করা
+    # যাবে না। আগে এই guard না থাকায় crop_stage=None নিয়ে
+    # calculate_irrigation() exception দিত।
+
+    missing_inputs = []
+
+
+    if water_requirement_method is None:
+
+        missing_inputs.append(
+            "পানির চাহিদা নির্ধারণের পদ্ধতি"
+        )
+
+        calculation_allowed = False
+
+
+    if crop_stage is None:
+
+        missing_inputs.append(
+            "ফসলের বৃদ্ধি পর্যায়"
+        )
+
+        calculation_allowed = False
+
+
+    # ========================================================
     # INPUT SIGNATURE
     # ========================================================
 
@@ -2281,7 +2712,7 @@ def _agriculture_input_panel():
         "স্মার্ট সেচ হিসাব করুন "
         "(Calculate Smart Irrigation)",
         type="primary",
-        width="stretch",
+        use_container_width=True,
         disabled=not calculation_allowed,
         key="agriculture_calculate_button"
     )
@@ -2289,10 +2720,20 @@ def _agriculture_input_panel():
 
     if not calculation_allowed:
 
-        st.caption(
-            "সঠিক Season / Planting Date নির্বাচন না করা পর্যন্ত "
-            "calculation চালানো যাবে না।"
-        )
+        if missing_inputs:
+
+            st.caption(
+                "হিসাব করার আগে নির্বাচন করুন: "
+                + ", ".join(missing_inputs)
+                + "।"
+            )
+
+        else:
+
+            st.caption(
+                "সঠিক Season / Planting Date নির্বাচন না করা পর্যন্ত "
+                "calculation চালানো যাবে না।"
+            )
 
 
     # ========================================================
@@ -2327,6 +2768,57 @@ def _agriculture_input_panel():
                     manual_crop_water_need_mm
                 )
             )
+
+
+            # ------------------------------------------------
+            # NO RAIN SCENARIO
+            # ------------------------------------------------
+            # যদি আজ কোনো বৃষ্টি না হয় — এই হিসাব result card-এ
+            # লিখিতভাবেও দেখানো হবে (voice-এর সাথে হুবহু এক)।
+
+            no_rain_net_mm = max(
+                float(result["crop_water_need"])
+                -
+                float(result["available_water"]),
+                0.0
+            )
+
+            efficiency_ratio = (
+                float(irrigation_efficiency)
+                /
+                100.0
+            )
+
+            no_rain_gross_mm = (
+                no_rain_net_mm
+                /
+                efficiency_ratio
+                if efficiency_ratio > 0
+                else 0.0
+            )
+
+            no_rain_water_liters = (
+                no_rain_gross_mm
+                *
+                float(result["area_m2"])
+            )
+
+
+            if no_rain_net_mm > 0:
+
+                no_rain_message = (
+                    f"যদি আজ কোনো বৃষ্টি না হয়, তাহলে জমিতে থাকা পানি বাদ দেওয়ার পর "
+                    f"প্রায় {no_rain_gross_mm:.1f} মিলিমিটার অথবা "
+                    f"{no_rain_water_liters:.0f} লিটার পানি সেচ দিতে হবে।"
+                )
+
+            else:
+
+                no_rain_message = (
+                    "যদি আজ কোনো বৃষ্টি না হয়, তবুও জমিতে থাকা পানি "
+                    "ফসলের বর্তমান দৈনিক পানির চাহিদা পূরণ করতে যথেষ্ট। "
+                    "অতিরিক্ত সেচের প্রয়োজন হবে না।"
+                )
 
 
             # ------------------------------------------------
@@ -2415,7 +2907,19 @@ def _agriculture_input_panel():
                     manual_crop_water_need_mm,
 
                 "crop_reference":
-                    crop_reference
+                    crop_reference,
+
+                "no_rain_net_mm":
+                    no_rain_net_mm,
+
+                "no_rain_gross_mm":
+                    no_rain_gross_mm,
+
+                "no_rain_water_liters":
+                    no_rain_water_liters,
+
+                "no_rain_message":
+                    no_rain_message,
             }
 
 
@@ -2428,68 +2932,8 @@ def _agriculture_input_panel():
 
             try:
 
-                no_rain_net_mm = max(
-                    float(result["crop_water_need"])
-                    -
-                    float(result["available_water"]),
-                    0.0
-                )
-
-                efficiency_ratio = (
-                    float(irrigation_efficiency)
-                    /
-                    100.0
-                )
-
-                no_rain_gross_mm = (
-                    no_rain_net_mm
-                    /
-                    efficiency_ratio
-                    if efficiency_ratio > 0
-                    else 0.0
-                )
-
-                no_rain_water_liters = (
-                    no_rain_gross_mm
-                    *
-                    float(result["area_m2"])
-                )
-
-
-                if no_rain_net_mm > 0:
-
-                    no_rain_message = (
-                        f"যদি আজ কোনো বৃষ্টি না হয়, তাহলে জমিতে থাকা পানি বাদ দেওয়ার পর "
-                        f"প্রায় {no_rain_gross_mm:.1f} মিলিমিটার অথবা "
-                        f"{no_rain_water_liters:.0f} লিটার পানি সেচ দিতে হবে।"
-                    )
-
-                else:
-
-                    no_rain_message = (
-                        "যদি আজ কোনো বৃষ্টি না হয়, তবুও জমিতে থাকা পানি "
-                        "ফসলের বর্তমান দৈনিক পানির চাহিদা পূরণ করতে যথেষ্ট। "
-                        "অতিরিক্ত সেচের প্রয়োজন হবে না।"
-                    )
-
-
-                st.session_state.agri_result.update({
-                    "no_rain_net_mm":
-                        no_rain_net_mm,
-
-                    "no_rain_gross_mm":
-                        no_rain_gross_mm,
-
-                    "no_rain_water_liters":
-                        no_rain_water_liters,
-
-                    "no_rain_message":
-                        no_rain_message,
-                })
-
-
                 # New result must always be allowed to play.
-                st.session_state["voice_hash"] = None
+                reset_voice_hash()
 
                 agriculture_result_voice(
                     irrigation_needed=(
@@ -2541,7 +2985,7 @@ def _agriculture_input_panel():
             except Exception as exc:
 
                 st.warning(
-                    f"ফলাফল ভয়েস তৈরি করা যায়নি "
+                    f"ফলাফল ভয়েস তৈরি করা যায়নি "
                     f"(Result voice failed): {exc}"
                 )
 
@@ -2556,7 +3000,7 @@ def _agriculture_input_panel():
         except Exception as exc:
 
             st.error(
-                f"সেচ হিসাব করা যায়নি "
+                f"সেচ হিসাব করা যায়নি "
                 f"(Irrigation calculation failed): {exc}"
             )
 
@@ -2575,6 +3019,10 @@ def show_agriculture_result():
     data = st.session_state.agri_result
 
     result = data["result"]
+
+    stage_info = data.get(
+        "stage_info"
+    ) or {}
 
 
     st.divider()
@@ -2602,82 +3050,12 @@ def show_agriculture_result():
 
 
     # ========================================================
-    # BASIC CROP INFO
+    # NOTE
     # ========================================================
-
-    a, b, c = st.columns(3)
-
-
-    a.metric(
-        "ফসল (Crop)",
-        data["crop_label"]
-    )
-
-
-    b.metric(
-        "মৌসুম (Season)",
-        data["season_label"]
-    )
-
-
-    c.metric(
-        "বৃদ্ধি পর্যায় (Growth Stage)",
-        data["crop_stage_label"]
-    )
-
-
-    # ========================================================
-    # CROP AGE
-    # ========================================================
-
-    st.info(
-        f"""
-        ফসলের বয়স:
-
-        {bn_num(
-            data['stage_info']['day_of_crop'],
-            0
-        )}
-        দিন /
-
-        {bn_num(
-            data['stage_info']['duration_days'],
-            0
-        )}
-        দিন
-
-        স্বয়ংক্রিয়ভাবে নির্ধারিত পর্যায়:
-
-        {data['stage_info']['stage_label']}
-
-        ব্যবহৃত পর্যায়:
-
-        {data['crop_stage_label']}
-        """
-    )
-
-
-    if data["stage_info"].get(
-        "day_of_crop"
-    ) is not None:
-
-        st.caption(
-            f"""
-            ফসলের বর্তমান দিন
-            (Current Day of Crop):
-
-            {bn_num(
-                data['stage_info']['day_of_crop'],
-                0
-            )}
-            /
-            {bn_num(
-                data['stage_info']['duration_days'],
-                0
-            )}
-            দিন
-            """
-        )
+    # ফসল / মৌসুম / বৃদ্ধি পর্যায় / ফসলের বয়স — এই তথ্যগুলো
+    # কৃষক উপরেই দিয়েছে। Result card-এ আবার দেখালে সিদ্ধান্তের
+    # উপর থেকে নজর সরে যায়। তাই এগুলো "হিসাবের বিস্তারিত"
+    # expander-এ সরানো হয়েছে।
 
 
     # ========================================================
@@ -2690,70 +3068,72 @@ def show_agriculture_result():
     )
 
 
-    a, b, c = st.columns(3)
+    with st.container(border=True):
+
+        a, b, c = st.columns(3)
 
 
-    a.metric(
-        "ET0 "
-        "(Reference Evapotranspiration)",
-        f"{bn_num(result['et0_mm'], 2)} mm/day"
-    )
-
-
-    b.metric(
-        "ফসল সহগ "
-        "(Crop Coefficient / Kc)",
-        f"{bn_num(result['kc'], 2)}"
-    )
-
-
-    c.metric(
-        "স্বয়ংক্রিয় ETc "
-        "(Automatic Crop Water Need)",
-        f"{bn_num(result['automatic_etc_mm'], 2)} mm/day"
-    )
-
-
-    # ========================================================
-    # APPLIED WATER NEED
-    # ========================================================
-
-    if result[
-        "water_requirement_method"
-    ] == "MANUAL":
-
-        st.info(
-            f"""
-            ব্যবহৃত দৈনিক ফসলের পানির চাহিদা
-            (Applied Daily Crop Water Requirement):
-
-            {bn_num(
-                result['crop_water_need'],
-                2
-            )}
-            mm/day
-
-            Manual Override
-            """
+        a.metric(
+            "ET0 "
+            "(Reference Evapotranspiration)",
+            f"{bn_num(result['et0_mm'], 2)} mm/day"
         )
 
 
-    else:
-
-        st.info(
-            f"""
-            ব্যবহৃত দৈনিক ফসলের পানির চাহিদা
-            (Applied Daily Crop Water Requirement):
-
-            {bn_num(
-                result['crop_water_need'],
-                2
-            )}
-            mm/day
-
-            ET0 × Kc
-            """
+        b.metric(
+            "ফসল সহগ "
+            "(Crop Coefficient / Kc)",
+            f"{bn_num(result['kc'], 2)}"
         )
+
+
+        c.metric(
+            "স্বয়ংক্রিয় ETc "
+            "(Automatic Crop Water Need)",
+            f"{bn_num(result['automatic_etc_mm'], 2)} mm/day"
+        )
+
+
+        # ----------------------------------------------------
+        # APPLIED WATER NEED
+        # ----------------------------------------------------
+
+        if result.get(
+            "water_requirement_method"
+        ) == "MANUAL":
+
+            st.info(
+                f"""
+                ব্যবহৃত দৈনিক ফসলের পানির চাহিদা
+                (Applied Daily Crop Water Requirement):
+
+                {bn_num(
+                    result['crop_water_need'],
+                    2
+                )}
+                mm/day
+
+                Manual Override
+                """
+            )
+
+
+        else:
+
+            st.info(
+                f"""
+                ব্যবহৃত দৈনিক ফসলের পানির চাহিদা
+                (Applied Daily Crop Water Requirement):
+
+                {bn_num(
+                    result['crop_water_need'],
+                    2
+                )}
+                mm/day
+
+                ET0 × Kc
+                """
+            )
 
 
     # ========================================================
@@ -2766,35 +3146,37 @@ def show_agriculture_result():
     )
 
 
-    a, b, c, d = st.columns(4)
+    with st.container(border=True):
+
+        a, b, c, d = st.columns(4)
 
 
-    a.metric(
-        "কার্যকর বৃষ্টির পানি "
-        "(Effective Rain)",
-        f"{bn_num(result['effective_rain'], 2)} mm"
-    )
+        a.metric(
+            "কার্যকর বৃষ্টির পানি "
+            "(Effective Rain)",
+            f"{bn_num(result['effective_rain'], 2)} mm"
+        )
 
 
-    b.metric(
-        "জমিতে থাকা পানি "
-        "(Available Water)",
-        f"{bn_num(result['available_water'], 2)} mm"
-    )
+        b.metric(
+            "জমিতে থাকা পানি "
+            "(Available Water)",
+            f"{bn_num(result['available_water'], 2)} mm"
+        )
 
 
-    c.metric(
-        "নিট সেচের প্রয়োজন "
-        "(Net Irrigation)",
-        f"{bn_num(result['net_water_needed'], 2)} mm"
-    )
+        c.metric(
+            "নিট সেচের প্রয়োজন "
+            "(Net Irrigation)",
+            f"{bn_num(result['net_water_needed'], 2)} mm"
+        )
 
 
-    d.metric(
-        "মোট সেচের প্রয়োজন "
-        "(Gross Irrigation)",
-        f"{bn_num(result['gross_water_mm'], 2)} mm"
-    )
+        d.metric(
+            "মোট সেচের প্রয়োজন "
+            "(Gross Irrigation)",
+            f"{bn_num(result['gross_water_mm'], 2)} mm"
+        )
 
 
     # ========================================================
@@ -2810,8 +3192,8 @@ def show_agriculture_result():
             ফসলের দৈনিক পানির চাহিদা:
             {bn_num(result['crop_water_need'], 2)} mm/day
 
-            জমিতে থাকা পানি বাদ দেওয়ার পর
-            নিট সেচের প্রয়োজন:
+            জমিতে থাকা পানি বাদ দেওয়ার পর
+            নিট সেচের প্রয়োজন:
             {bn_num(result['net_water_needed'], 2)} mm।
             """
         )
@@ -2830,7 +3212,7 @@ def show_agriculture_result():
             জমিতে থাকা পানি:
             {bn_num(result['available_water'], 2)} mm
 
-            নিট সেচের প্রয়োজন:
+            নিট সেচের প্রয়োজন:
             {bn_num(result['net_water_needed'], 2)} mm।
             """
         )
@@ -2841,30 +3223,161 @@ def show_agriculture_result():
     # ========================================================
 
     section_title(
-        "কতটুকু পানি প্রয়োজন",
+        "কতটুকু পানি প্রয়োজন",
         "How Much Water"
     )
 
 
-    a, b, c = st.columns(3)
+    with st.container(border=True):
+
+        a, b, c = st.columns(3)
 
 
-    a.metric(
-        "লিটার (Liters)",
-        f"{bn_num(result['water_liters'], 0, True)} L"
+        a.metric(
+            "লিটার (Liters)",
+            f"{bn_num(result['water_liters'], 0, True)} L"
+        )
+
+
+        b.metric(
+            "ঘনমিটার (Cubic Meter)",
+            f"{bn_num(result['water_m3'], 2, True)} m³"
+        )
+
+
+        c.metric(
+            "জমির আয়তন (Land Area)",
+            f"{bn_num(result['area_m2'], 0, True)} m²"
+        )
+
+
+    # ========================================================
+    # IF THERE IS NO RAIN TODAY
+    # ========================================================
+    #
+    # Voice-এ এই কথাটা বলা হতো কিন্তু screen-এ লেখা ছিল না।
+    # এখন voice এবং লেখা একই message ব্যবহার করছে।
+
+    section_title(
+        "আজ বৃষ্টি না হলে করণীয়",
+        "If There Is No Rain Today"
     )
 
 
-    b.metric(
-        "ঘনমিটার (Cubic Meter)",
-        f"{bn_num(result['water_m3'], 2, True)} m³"
+    no_rain_net_mm = data.get(
+        "no_rain_net_mm"
     )
 
 
-    c.metric(
-        "জমির আয়তন (Land Area)",
-        f"{bn_num(result['area_m2'], 0, True)} m²"
-    )
+    if no_rain_net_mm is None:
+
+        # পুরোনো session-এর result হলে এখানেই হিসাব করা হবে।
+
+        no_rain_net_mm = max(
+            float(result["crop_water_need"])
+            -
+            float(result["available_water"]),
+            0.0
+        )
+
+        efficiency_ratio = (
+            float(data.get("efficiency", 100))
+            /
+            100.0
+        )
+
+        no_rain_gross_mm = (
+            no_rain_net_mm
+            /
+            efficiency_ratio
+            if efficiency_ratio > 0
+            else 0.0
+        )
+
+        no_rain_water_liters = (
+            no_rain_gross_mm
+            *
+            float(result["area_m2"])
+        )
+
+    else:
+
+        no_rain_gross_mm = float(
+            data.get(
+                "no_rain_gross_mm",
+                0.0
+            )
+        )
+
+        no_rain_water_liters = float(
+            data.get(
+                "no_rain_water_liters",
+                0.0
+            )
+        )
+
+
+    with st.container(border=True):
+
+        a, b, c = st.columns(3)
+
+
+        a.metric(
+            "বৃষ্টি ছাড়া নিট চাহিদা "
+            "(Net Need without Rain)",
+            f"{bn_num(no_rain_net_mm, 2)} mm"
+        )
+
+
+        b.metric(
+            "বৃষ্টি ছাড়া মোট সেচ "
+            "(Gross Irrigation without Rain)",
+            f"{bn_num(no_rain_gross_mm, 2)} mm"
+        )
+
+
+        c.metric(
+            "প্রয়োজনীয় পানি "
+            "(Water Required)",
+            f"{bn_num(no_rain_water_liters, 0, True)} L"
+        )
+
+
+        no_rain_message = data.get(
+            "no_rain_message"
+        )
+
+
+        if no_rain_net_mm > 0:
+
+            st.warning(
+                no_rain_message
+                or (
+                    f"যদি আজ কোনো বৃষ্টি না হয়, তাহলে জমিতে থাকা পানি "
+                    f"বাদ দেওয়ার পর প্রায় "
+                    f"{bn_num(no_rain_gross_mm, 1)} মিলিমিটার অথবা "
+                    f"{bn_num(no_rain_water_liters, 0, True)} লিটার "
+                    f"পানি সেচ দিতে হবে।"
+                )
+            )
+
+
+            st.caption(
+                "এই হিসাবে আজকের বৃষ্টির পূর্বাভাস ধরা হয়নি। "
+                "শুধু জমিতে থাকা পানি বাদ দেওয়া হয়েছে।"
+            )
+
+
+        else:
+
+            st.success(
+                no_rain_message
+                or (
+                    "যদি আজ কোনো বৃষ্টি না হয়, তবুও জমিতে থাকা পানি "
+                    "ফসলের বর্তমান দৈনিক পানির চাহিদা পূরণ করতে যথেষ্ট। "
+                    "অতিরিক্ত সেচের প্রয়োজন হবে না।"
+                )
+            )
 
 
     # ========================================================
@@ -2877,37 +3390,39 @@ def show_agriculture_result():
     )
 
 
-    a, b, c = st.columns(3)
+    with st.container(border=True):
+
+        a, b, c = st.columns(3)
 
 
-    a.metric(
-        "পানির গভীরতা (Water Depth)",
-        f"{bn_num(data['existing_water'], 1)} mm"
-    )
+        a.metric(
+            "পানির গভীরতা (Water Depth)",
+            f"{bn_num(data['existing_water'], 1)} mm"
+        )
 
 
-    b.metric(
-        "আনুমানিক মোট পানি "
-        "(Estimated Total Water)",
-        f"{bn_num(data['existing_water_liters'], 0, True)} L"
-    )
+        b.metric(
+            "আনুমানিক মোট পানি "
+            "(Estimated Total Water)",
+            f"{bn_num(data['existing_water_liters'], 0, True)} L"
+        )
 
 
-    c.metric(
-        "আনুমানিক পানির পরিমাণ "
-        "(Estimated Volume)",
-        f"{bn_num(data['existing_water_m3'], 2, True)} m³"
-    )
+        c.metric(
+            "আনুমানিক পানির পরিমাণ "
+            "(Estimated Volume)",
+            f"{bn_num(data['existing_water_m3'], 2, True)} m³"
+        )
 
 
-    st.caption(
-        f"""
-        ব্যবহৃত পরিমাপ:
-        {data['water_measurement']}।
+        st.caption(
+            f"""
+            ব্যবহৃত পরিমাপ:
+            {data['water_measurement']}।
 
-        এটি একটি আনুমানিক হিসাব।
-        """
-    )
+            এটি একটি আনুমানিক হিসাব।
+            """
+        )
 
 
     # ========================================================
@@ -2926,7 +3441,7 @@ def show_agriculture_result():
     if result["status"] == "NO_IRRIGATION":
 
         recommendations.append(
-            "আজ অতিরিক্ত সেচ দেওয়ার প্রয়োজন নেই।"
+            "আজ অতিরিক্ত সেচ দেওয়ার প্রয়োজন নেই।"
         )
 
         recommendations.append(
@@ -2945,7 +3460,7 @@ def show_agriculture_result():
     elif result["status"] == "MEDIUM":
 
         recommendations.append(
-            "মাঝারি পরিমাণ সেচ দেওয়া ভালো হবে।"
+            "মাঝারি পরিমাণ সেচ দেওয়া ভালো হবে।"
         )
 
 
@@ -2957,11 +3472,19 @@ def show_agriculture_result():
         )
 
 
+    # Voice-এ বলা "বৃষ্টি না হলে করণীয়" পরামর্শেও রাখা হলো।
+    if data.get("no_rain_message"):
+
+        recommendations.append(
+            data["no_rain_message"]
+        )
+
+
     if data["predicted_rain"] >= 20:
 
         recommendations.append(
             "বৃষ্টির পরিমাণ বেশি হতে পারে। "
-            "সেচ দেওয়ার আগে বৃষ্টির পরিস্থিতি বিবেচনা করুন।"
+            "সেচ দেওয়ার আগে বৃষ্টির পরিস্থিতি বিবেচনা করুন।"
         )
 
 
@@ -2982,8 +3505,8 @@ def show_agriculture_result():
     ):
 
         recommendations.append(
-            "বেলে মাটিতে পানি দ্রুত নিচে চলে যায়। "
-            "প্রয়োজন হলে একবারে বেশি পানি না দিয়ে "
+            "বেলে মাটিতে পানি দ্রুত নিচে চলে যায়। "
+            "প্রয়োজন হলে একবারে বেশি পানি না দিয়ে "
             "ভাগ করে সেচ দিন।"
         )
 
@@ -2993,8 +3516,8 @@ def show_agriculture_result():
     ):
 
         recommendations.append(
-            "এঁটেল মাটি পানি বেশি সময় ধরে রাখে। "
-            "সেচ দেওয়ার আগে জমিতে পানি জমে আছে কিনা "
+            "এঁটেল মাটি পানি বেশি সময় ধরে রাখে। "
+            "সেচ দেওয়ার আগে জমিতে পানি জমে আছে কিনা "
             "পরীক্ষা করুন।"
         )
 
@@ -3004,8 +3527,8 @@ def show_agriculture_result():
     ):
 
         recommendations.append(
-            "ড্রিপ সেচ পানি সাশ্রয়ে কার্যকর এবং "
-            "নিয়ন্ত্রিতভাবে পানি সরবরাহ করতে সাহায্য করে।"
+            "ড্রিপ সেচ পানি সাশ্রয়ে কার্যকর এবং "
+            "নিয়ন্ত্রিতভাবে পানি সরবরাহ করতে সাহায্য করে।"
         )
 
 
@@ -3019,7 +3542,7 @@ def show_agriculture_result():
     recommendation_clicked = st.button(
         "স্মার্ট পরামর্শ দেখুন ও শুনুন "
         "(Show & Listen to Smart Recommendations)",
-        width="stretch",
+        use_container_width=True,
         key="agriculture_recommendation_button"
     )
 
@@ -3029,6 +3552,9 @@ def show_agriculture_result():
         st.session_state[
             "agriculture_show_recommendations"
         ] = True
+
+        # একই পরামর্শ আবার শুনতে চাইলেও যেন বাজে।
+        reset_voice_hash()
 
         agriculture_recommendation_voice(
             recommendations
@@ -3040,11 +3566,13 @@ def show_agriculture_result():
         False
     ):
 
-        for rec in recommendations:
+        with st.container(border=True):
 
-            st.write(
-                f"• {rec}"
-            )
+            for rec in recommendations:
+
+                st.write(
+                    f"• {rec}"
+                )
 
 
     # ========================================================
@@ -3080,8 +3608,23 @@ def show_agriculture_result():
 
 
         st.write(
-            f"বৃদ্ধি পর্যায় "
-            f"(Growth Stage): "
+            f"ফসলের বয়স "
+            f"(Crop Age): "
+            f"{bn_num(stage_info.get('day_of_crop'), 0)} / "
+            f"{bn_num(stage_info.get('duration_days'), 0)} দিন"
+        )
+
+
+        st.write(
+            f"স্বয়ংক্রিয়ভাবে নির্ধারিত পর্যায় "
+            f"(Auto Stage): "
+            f"{stage_info.get('stage_label', 'N/A')}"
+        )
+
+
+        st.write(
+            f"ব্যবহৃত বৃদ্ধি পর্যায় "
+            f"(Applied Growth Stage): "
             f"{data['crop_stage_label']}"
         )
 
@@ -3153,7 +3696,23 @@ def show_agriculture_result():
 
 
         st.write(
-            f"জমির আয়তন "
+            f"বৃষ্টি ছাড়া নিট সেচ "
+            f"(Net Irrigation without Rain): "
+            f"{bn_num(no_rain_net_mm, 2)} mm"
+        )
+
+
+        st.write(
+            f"বৃষ্টি ছাড়া মোট সেচ "
+            f"(Gross Irrigation without Rain): "
+            f"{bn_num(no_rain_gross_mm, 2)} mm "
+            f"/ "
+            f"{bn_num(no_rain_water_liters, 0, True)} L"
+        )
+
+
+        st.write(
+            f"জমির আয়তন "
             f"(Area): "
             f"{bn_num(result['area_m2'], 2, True)} m²"
         )
@@ -3175,7 +3734,10 @@ def show_agriculture_result():
             "Effective Rainfall − "
             "Available Water, 0); "
             "Gross Irrigation = "
-            "Net Irrigation ÷ Efficiency."
+            "Net Irrigation ÷ Efficiency; "
+            "No-Rain Net = max("
+            "Applied Crop Water Requirement − "
+            "Available Water, 0)."
         )
 
 
@@ -3200,7 +3762,10 @@ def show_agriculture_result():
             "(Net Irrigation)",
 
             "মোট সেচ "
-            "(Gross Irrigation)"
+            "(Gross Irrigation)",
+
+            "বৃষ্টি ছাড়া মোট সেচ "
+            "(No Rain Gross)"
         ],
 
         "পানি (Water mm)": [
@@ -3213,7 +3778,9 @@ def show_agriculture_result():
 
             result["net_water_needed"],
 
-            result["gross_water_mm"]
+            result["gross_water_mm"],
+
+            no_rain_gross_mm
         ]
     })
 
@@ -3238,7 +3805,7 @@ def show_agriculture_result():
 
     st.plotly_chart(
         fig,
-        width="stretch"
+        use_container_width=True
     )
 
 
@@ -3247,6 +3814,14 @@ def show_agriculture_result():
 # ============================================================
 
 def show_agriculture():
+
+    # ========================================================
+    # STYLES
+    # ========================================================
+    # প্রতিটি rerun-এ inject করতে হবে।
+
+    inject_agriculture_styles()
+
 
     # ========================================================
     # WELCOME
@@ -3267,7 +3842,7 @@ def show_agriculture():
     st.caption(
         "ফসল, মৌসুম, রোপণ/বপনের তারিখ, জমির পরিমাণ, "
         "মাটির ধরন, বৃষ্টির পূর্বাভাস এবং জমিতে থাকা পানি "
-        "অনুযায়ী সেচের পানি হিসাব করুন।"
+        "অনুযায়ী সেচের পানি হিসাব করুন।"
     )
 
 
@@ -3277,8 +3852,8 @@ def show_agriculture():
             <h3>Smart Irrigation Recommendation</h3>
             <p>
             ফসলের মৌসুম, প্রকৃত রোপণ/বপনের তারিখ,
-            বৃদ্ধি পর্যায়, জমির পরিমাণ, বৃষ্টির পূর্বাভাস
-            এবং ET0 ব্যবহার করে প্রয়োজনীয় সেচের পরিমাণ
+            বৃদ্ধি পর্যায়, জমির পরিমাণ, বৃষ্টির পূর্বাভাস
+            এবং ET0 ব্যবহার করে প্রয়োজনীয় সেচের পরিমাণ
             হিসাব করা হবে।
             </p>
         </div>

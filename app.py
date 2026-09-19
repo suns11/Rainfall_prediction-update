@@ -1178,35 +1178,216 @@ if st.session_state.page not in PAGES:
 
 
 # ============================================================
-# SIDEBAR
+# THEME STATE (persists across all pages)
+# ============================================================
+
+THEME_LABELS = {
+    "light": "☀️ Light",
+    "dark": "🌙 Dark"
+}
+
+if "theme" not in st.session_state:
+    saved_theme = st.query_params.get("theme", "light")
+    st.session_state.theme = "dark" if saved_theme == "dark" else "light"
+
+
+# ============================================================
+# SIDEBAR - PROFESSIONAL NAVIGATION CSS
+# ============================================================
+
+st.markdown(
+    """
+<style>
+
+/* ---------- Sidebar container ---------- */
+
+[data-testid="stSidebar"] > div:first-child {
+    padding-top: 0.6rem !important;
+}
+
+[data-testid="stSidebar"] hr {
+    border-color: rgba(255,255,255,0.10) !important;
+    margin: 0.9rem 0 !important;
+}
+
+
+/* ---------- Brand ---------- */
+
+.sb-brand {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.4rem 0.4rem 0.2rem 0.4rem;
+}
+
+.sb-logo {
+    width: 42px;
+    height: 42px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.3rem;
+    background: linear-gradient(135deg, #168F87, #55D6C2);
+    box-shadow: 0 6px 16px rgba(22,143,135,0.35);
+}
+
+.sb-title {
+    font-family: 'Space Grotesk', sans-serif;
+    font-weight: 700;
+    font-size: 1.05rem;
+    color: #FFFFFF;
+    line-height: 1.2;
+}
+
+.sb-sub {
+    font-size: 0.72rem;
+    color: #8FB3C4;
+    letter-spacing: 0.02em;
+}
+
+
+/* ---------- Section labels ---------- */
+
+.sb-section {
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: #6F94A6;
+    padding: 0.3rem 0.5rem 0.4rem 0.5rem;
+}
+
+
+/* ---------- Navigation items ---------- */
+
+[data-testid="stSidebar"] [data-testid="stRadio"] div[role="radiogroup"] {
+    gap: 0.25rem !important;
+}
+
+[data-testid="stSidebar"] [data-testid="stRadio"] label {
+    width: 100% !important;
+    padding: 0.7rem 0.9rem !important;
+    border-radius: 10px !important;
+    border-left: 3px solid transparent !important;
+    background: transparent !important;
+    cursor: pointer !important;
+    transition: all 0.18s ease !important;
+}
+
+/* hide the radio circle */
+[data-testid="stSidebar"] [data-testid="stRadio"] label > div:first-child {
+    display: none !important;
+}
+
+[data-testid="stSidebar"] [data-testid="stRadio"] label p {
+    font-size: 0.93rem !important;
+    font-weight: 500 !important;
+    margin: 0 !important;
+    color: #C9DCE6 !important;
+}
+
+[data-testid="stSidebar"] [data-testid="stRadio"] label:hover {
+    background: rgba(255,255,255,0.07) !important;
+    transform: translateX(2px);
+}
+
+[data-testid="stSidebar"] [data-testid="stRadio"] label:hover p {
+    color: #FFFFFF !important;
+}
+
+/* active page */
+[data-testid="stSidebar"] [data-testid="stRadio"] label:has(input:checked) {
+    background: linear-gradient(
+        90deg,
+        rgba(85,214,194,0.22),
+        rgba(85,214,194,0.04)
+    ) !important;
+    border-left-color: #55D6C2 !important;
+}
+
+[data-testid="stSidebar"] [data-testid="stRadio"] label:has(input:checked) p {
+    color: #FFFFFF !important;
+    font-weight: 700 !important;
+}
+
+
+/* ---------- Theme switch (segmented control) ---------- */
+
+[data-testid="stSidebar"] [data-testid="stButtonGroup"] {
+    width: 100% !important;
+}
+
+[data-testid="stSidebar"] [data-testid="stButtonGroup"] button {
+    flex: 1 !important;
+    min-height: 40px !important;
+    border-radius: 10px !important;
+    background: rgba(255,255,255,0.06) !important;
+    border: 1px solid rgba(255,255,255,0.12) !important;
+    color: #C9DCE6 !important;
+    font-weight: 600 !important;
+}
+
+[data-testid="stSidebar"] [data-testid="stButtonGroup"] button p {
+    color: inherit !important;
+}
+
+[data-testid="stSidebar"] [data-testid="stButtonGroup"] button[data-testid="stBaseButton-segmented_controlActive"] {
+    background: linear-gradient(135deg, #168F87, #1F9E92) !important;
+    border-color: #168F87 !important;
+    color: #FFFFFF !important;
+    box-shadow: 0 4px 12px rgba(22,143,135,0.30) !important;
+}
+
+
+/* ---------- Sidebar footer note ---------- */
+
+.sb-note {
+    font-size: 0.72rem;
+    color: #6F94A6;
+    text-align: center;
+    padding-top: 0.8rem;
+    line-height: 1.6;
+}
+
+</style>
+""",
+    unsafe_allow_html=True
+)
+
+
+# ============================================================
+# SIDEBAR - BRAND
 # ============================================================
 
 st.sidebar.markdown(
     """
-    <div style="
-    font-family:Space Grotesk;
-    font-weight:700;
-    font-size:1.25rem;
-    color:#fff;
-    padding:.2rem 0 1rem 0
-    ">
-
-    🌧️ Smart Rain & Agriculture
-
+    <div class="sb-brand">
+        <div class="sb-logo">🌧️</div>
+        <div>
+            <div class="sb-title">Smart Rain & Agriculture</div>
+            <div class="sb-sub">Bangladesh Forecast System</div>
+        </div>
     </div>
     """,
     unsafe_allow_html=True
 )
+
+st.sidebar.divider()
 
 
 # ============================================================
 # NAVIGATION
 # ============================================================
 
+st.sidebar.markdown(
+    "<div class='sb-section'>Menu</div>",
+    unsafe_allow_html=True
+)
+
 page_index = PAGES.index(
     st.session_state.page
 )
-
 
 selected_page = st.sidebar.radio(
     "Navigation",
@@ -1214,6 +1395,238 @@ selected_page = st.sidebar.radio(
     index=page_index,
     label_visibility="collapsed"
 )
+
+
+# ============================================================
+# THEME SWITCH
+# ============================================================
+
+st.sidebar.divider()
+
+st.sidebar.markdown(
+    "<div class='sb-section'>Appearance</div>",
+    unsafe_allow_html=True
+)
+
+theme_choice = st.sidebar.segmented_control(
+    "Theme",
+    options=list(THEME_LABELS.values()),
+    default=THEME_LABELS[st.session_state.theme],
+    label_visibility="collapsed"
+)
+
+# if user clicks the active one (None), keep current theme
+if theme_choice is None:
+    theme_choice = THEME_LABELS[st.session_state.theme]
+
+new_theme = "dark" if "Dark" in theme_choice else "light"
+
+if new_theme != st.session_state.theme:
+    st.session_state.theme = new_theme
+    st.query_params["theme"] = new_theme
+    st.rerun()
+
+
+
+
+# ============================================================
+# DARK THEME (only injected when Dark is selected)
+# ============================================================
+
+if st.session_state.theme == "dark":
+
+    # Plotly charts
+    pio.templates["monsoon"].layout.font.color = "#E6EDF3"
+    pio.templates["monsoon"].layout.title.font.color = "#7FE0D2"
+    pio.templates["monsoon"].layout.xaxis.gridcolor = "#263545"
+    pio.templates["monsoon"].layout.yaxis.gridcolor = "#263545"
+
+    st.markdown(
+        """
+<style>
+
+:root {
+    --bg: #0E1621;
+    --card: #16212E;
+    --ink: #E6EDF3;
+    --text: #E6EDF3;
+    --muted: #9FB0BF;
+    --indigo: #7FE0D2;
+    --line: #263545;
+}
+
+html, body,
+[data-testid="stAppViewContainer"],
+[data-testid="stMain"],
+.stApp {
+    background-color: #0E1621 !important;
+    color: #E6EDF3 !important;
+}
+
+[data-testid="stHeader"] {
+    background-color: #0E1621 !important;
+}
+
+[data-testid="stMain"] p,
+[data-testid="stMain"] li,
+[data-testid="stMain"] .stMarkdown,
+[data-testid="stMain"] .stMarkdown p,
+[data-testid="stMain"] .stMarkdown li {
+    color: #E6EDF3 !important;
+}
+
+[data-testid="stMain"] h1,
+[data-testid="stMain"] h2,
+[data-testid="stMain"] h3,
+[data-testid="stMain"] h4,
+.section-title {
+    color: #7FE0D2 !important;
+}
+
+/* keep hero text white */
+.hero h1, .hero p, .hero-num, .hero-label {
+    color: #FFFFFF !important;
+}
+
+/* cards */
+.card {
+    background: #16212E !important;
+    border-color: #263545 !important;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.35) !important;
+}
+.card p, .card span { color: #E6EDF3 !important; }
+
+.agri-card {
+    background: linear-gradient(135deg, #13291F, #16212E) !important;
+    border-color: #245A3A !important;
+    border-left-color: #2E8B57 !important;
+}
+.agri-card h1, .agri-card h2, .agri-card h3, .agri-card h4 { color: #6FD39A !important; }
+.agri-card p { color: #E6EDF3 !important; }
+
+.result-card {
+    background: linear-gradient(135deg, #13291F, #16212E) !important;
+    border-color: #245A3A !important;
+}
+.result-card h1, .result-card h2, .result-card h3, .result-card p { color: #6FD39A !important; }
+
+/* labels & inputs */
+[data-testid="stMain"] label,
+[data-testid="stSelectbox"] label,
+[data-testid="stSelectbox"] label p,
+[data-testid="stSelectbox"] label span,
+[data-testid="stRadio"] label,
+[data-testid="stRadio"] p {
+    color: #E6EDF3 !important;
+}
+
+[data-testid="stMain"] input:not([type="date"]),
+[data-testid="stNumberInput"] input,
+[data-testid="stMain"] textarea,
+[data-baseweb="input"] {
+    background-color: #16212E !important;
+    color: #E6EDF3 !important;
+    caret-color: #E6EDF3 !important;
+    border-color: #33475A !important;
+}
+
+[data-testid="stMain"] [data-baseweb="select"],
+[data-testid="stMain"] [data-baseweb="select"] > div {
+    background-color: #16212E !important;
+    color: #E6EDF3 !important;
+    border-color: #33475A !important;
+}
+
+[data-testid="stMain"] [data-baseweb="select"] div,
+[data-testid="stMain"] [data-baseweb="select"] span,
+[data-testid="stMain"] [data-baseweb="select"] p,
+[data-testid="stMain"] [data-baseweb="select"] input,
+[data-testid="stMain"] [data-baseweb="select"] svg {
+    color: #E6EDF3 !important;
+}
+
+[data-testid="stMain"] [data-baseweb="select"]:focus-within > div {
+    background-color: #16212E !important;
+    border-color: #55D6C2 !important;
+}
+
+[data-baseweb="popover"],
+[data-baseweb="menu"],
+[role="listbox"],
+[role="option"] {
+    background-color: #16212E !important;
+    color: #E6EDF3 !important;
+}
+
+[role="option"]:hover,
+[role="option"][aria-selected="true"] {
+    background-color: #1F3446 !important;
+    color: #FFFFFF !important;
+}
+
+/* date inputs */
+.st-key-prediction_date [data-testid="stDateInput"] > div,
+.st-key-historical_date_range [data-testid="stDateInput"] > div,
+.st-key-prediction_date [data-testid="stDateInput"] input,
+.st-key-historical_date_range [data-testid="stDateInput"] input,
+.st-key-prediction_date [data-testid="stDateInput"] button,
+.st-key-historical_date_range [data-testid="stDateInput"] button {
+    background-color: #16212E !important;
+    color: #E6EDF3 !important;
+}
+
+.st-key-prediction_date [data-testid="stDateInput"] button svg,
+.st-key-historical_date_range [data-testid="stDateInput"] button svg {
+    color: #E6EDF3 !important;
+}
+
+/* buttons */
+.stButton > button {
+    background: #16212E !important;
+    color: #7FE0D2 !important;
+    border-color: #168F87 !important;
+}
+.stButton > button:hover {
+    background: #1F3446 !important;
+}
+.stButton > button[kind="primary"] {
+    background: linear-gradient(135deg, #168F87, #1F9E92) !important;
+    color: #FFFFFF !important;
+}
+
+/* metrics, tables, expanders */
+div[data-testid="stMetric"],
+[data-testid="stDataFrame"],
+[data-testid="stExpander"] {
+    background: #16212E !important;
+    border-color: #263545 !important;
+}
+
+[data-testid="stMetricLabel"],
+[data-testid="stMetricLabel"] * { color: #9FB0BF !important; }
+
+[data-testid="stMetricValue"],
+[data-testid="stMetricValue"] * { color: #7FE0D2 !important; }
+
+[data-testid="stExpander"] p,
+[data-testid="stExpander"] span { color: #E6EDF3 !important; }
+
+hr { border-color: #263545 !important; }
+
+/* footer */
+.footer { color: #9FB0BF !important; }
+.footer b { color: #E6EDF3 !important; }
+
+/* sidebar goes a little deeper */
+[data-testid="stSidebar"] {
+    background: linear-gradient(180deg, #08121F 0%, #0C1A2A 100%) !important;
+    border-right: 1px solid #1B2A3A !important;
+}
+
+</style>
+""",
+        unsafe_allow_html=True
+    )
 
 
 # ============================================================
