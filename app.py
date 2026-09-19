@@ -43,7 +43,7 @@ st.set_page_config(
     page_title="Bangladesh Rainfall & Agriculture System",
     page_icon="🌧️",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="auto"
 )
 
 
@@ -1672,6 +1672,117 @@ for _k, _v in {
     RADIO_BOX_CSS = RADIO_BOX_CSS.replace(_k, _v)
 
 st.markdown(RADIO_BOX_CSS, unsafe_allow_html=True)
+
+
+# ============================================================
+# MOBILE / PHONE OPTIMISATION (CSS only, no logic change)
+# Desktop is untouched: everything is inside @media queries.
+# ============================================================
+
+st.markdown(
+    """
+<style>
+
+@media (max-width: 768px) {
+
+    /* stop sideways scrolling */
+    html, body,
+    [data-testid="stAppViewContainer"],
+    [data-testid="stMain"] {
+        overflow-x: hidden !important;
+    }
+
+    .block-container {
+        padding: 1rem 0.9rem 4rem 0.9rem !important;
+    }
+
+    /* headings */
+    [data-testid="stMain"] h1 { font-size: 1.55rem !important; line-height: 1.3 !important; }
+    [data-testid="stMain"] h2 { font-size: 1.3rem !important; }
+    [data-testid="stMain"] h3 { font-size: 1.15rem !important; }
+
+    .section-title {
+        font-size: 1.05rem !important;
+        margin-top: 1.2rem !important;
+        margin-bottom: 0.8rem !important;
+    }
+
+    /* cards */
+    .card, .agri-card, .result-card {
+        padding: 1rem !important;
+        border-radius: 14px !important;
+    }
+
+    /* hero stats: two per row */
+    .hero-stats { gap: 1rem !important; }
+    .hero-stat  { flex: 1 1 40% !important; }
+
+    /* inputs: 16px stops iPhone auto-zoom, bigger touch area */
+    [data-testid="stMain"] input,
+    [data-testid="stMain"] textarea {
+        font-size: 16px !important;
+    }
+
+    [data-testid="stMain"] [data-baseweb="select"] > div {
+        min-height: 46px !important;
+    }
+
+    /* buttons: full width, finger friendly */
+    .stButton > button,
+    [data-testid="stFormSubmitButton"] button {
+        min-height: 48px !important;
+        width: 100% !important;
+    }
+
+    /* radio boxes: bigger touch target */
+    [data-testid="stMain"] [data-testid="stRadio"]:not(#x) div[role="radiogroup"]:not(#x) > label:not(#x) {
+        min-height: 48px !important;
+        padding: 0.8rem 0.9rem !important;
+    }
+
+    /* metrics */
+    div[data-testid="stMetric"] { padding: 0.8rem !important; }
+    [data-testid="stMetricValue"],
+    [data-testid="stMetricValue"] * { font-size: 1.4rem !important; }
+
+    /* bottom quick navigation: 2 x 2 grid */
+    [data-testid="stHorizontalBlock"]:has([class*="st-key-quick_nav_"]) {
+        flex-wrap: wrap !important;
+        gap: 0.6rem !important;
+    }
+    [data-testid="stHorizontalBlock"]:has([class*="st-key-quick_nav_"]) > [data-testid="stColumn"],
+    [data-testid="stHorizontalBlock"]:has([class*="st-key-quick_nav_"]) > [data-testid="column"] {
+        flex: 1 1 calc(50% - 0.6rem) !important;
+        min-width: calc(50% - 0.6rem) !important;
+    }
+
+    /* charts: hide hover toolbar (it covers the chart on touch) */
+    .js-plotly-plot .modebar-container { display: none !important; }
+
+    /* tables scroll inside their own box */
+    [data-testid="stDataFrame"] { max-width: 100% !important; }
+
+    /* sidebar menu: bigger touch rows */
+    [data-testid="stSidebar"] [data-testid="stRadio"] label {
+        padding: 0.85rem 0.9rem !important;
+    }
+
+    .footer { font-size: 0.85rem !important; padding: 1.5rem 0 1rem !important; }
+}
+
+
+@media (max-width: 420px) {
+
+    .hero { padding: 1.2rem !important; }
+    .hero h1 { font-size: 1.3rem !important; }
+    .hero p  { font-size: 0.9rem !important; }
+    .hero-num { font-size: 1.15rem !important; }
+}
+
+</style>
+""",
+    unsafe_allow_html=True
+)
 
 
 # ============================================================
