@@ -1378,6 +1378,29 @@ st.markdown(
 
 [data-testid="stSidebar"] [data-testid="stButtonGroup"] button p {
     color: inherit !important;
+    white-space: nowrap !important;
+    overflow: visible !important;
+    text-overflow: clip !important;
+    font-size: 0.86rem !important;
+}
+
+[data-testid="stSidebar"] [data-testid="stButtonGroup"] {
+    display: flex !important;
+    gap: 0.4rem !important;
+}
+
+[data-testid="stSidebar"] [data-testid="stButtonGroup"] button {
+    flex: 1 1 0 !important;
+    min-width: 0 !important;
+    padding-left: 0.4rem !important;
+    padding-right: 0.4rem !important;
+}
+
+[data-testid="stSidebar"] [data-testid="stButtonGroup"] button [data-testid="stMarkdownContainer"],
+[data-testid="stSidebar"] [data-testid="stButtonGroup"] button div {
+    overflow: visible !important;
+    text-overflow: clip !important;
+    white-space: nowrap !important;
 }
 
 [data-testid="stSidebar"] [data-testid="stButtonGroup"] button[data-testid="stBaseButton-segmented_controlActive"] {
@@ -1474,11 +1497,6 @@ if new_theme != st.session_state.theme:
     st.query_params["theme"] = new_theme
     apply_native_theme(new_theme)
     st.rerun()
-
-st.sidebar.markdown(
-    "<div class='sb-note'>Theme all pages e apply hobe</div>",
-    unsafe_allow_html=True
-)
 
 
 # ============================================================
