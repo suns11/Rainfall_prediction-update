@@ -84,11 +84,66 @@ pio.templates.default = "monsoon"
 
 
 # ============================================================
-# CSS - PROFESSIONAL UI
+# THEME STATE (persists across all pages)
 # ============================================================
 
-st.markdown(
-    """
+THEME_LABELS = {
+    "light": "☀️ Light",
+    "dark": "🌙 Dark"
+}
+
+if "theme" not in st.session_state:
+    saved_theme = st.query_params.get("theme", "light")
+    st.session_state.theme = "dark" if saved_theme == "dark" else "light"
+
+
+# ============================================================
+# NATIVE STREAMLIT THEME
+# Streamlit's own widgets (inputs, selects, date picker, buttons,
+# metrics, tables, expanders...) switch to dark natively.
+# Light mode = original Streamlit default (nothing changes).
+# ============================================================
+
+DARK_NATIVE = {
+    "theme.base": "dark",
+    "theme.primaryColor": "#168F87",
+    "theme.backgroundColor": "#0E1621",
+    "theme.secondaryBackgroundColor": "#16212E",
+    "theme.textColor": "#E6EDF3",
+}
+
+LIGHT_NATIVE = {
+    "theme.base": "light",
+    "theme.primaryColor": None,
+    "theme.backgroundColor": None,
+    "theme.secondaryBackgroundColor": None,
+    "theme.textColor": None,
+}
+
+
+def apply_native_theme(theme_name):
+    """Set Streamlit's native theme. Returns True if it changed."""
+    wanted = DARK_NATIVE if theme_name == "dark" else LIGHT_NATIVE
+    current_base = st._config.get_option("theme.base")
+    if current_base == wanted["theme.base"]:
+        return False
+    for key, value in wanted.items():
+        st._config.set_option(key, value)
+    return True
+
+
+# first load (e.g. ?theme=dark in URL) -> sync native theme once
+if apply_native_theme(st.session_state.theme):
+    st.rerun()
+
+
+# ============================================================
+# CSS - PROFESSIONAL UI
+# (unchanged. Streamlit-widget styling is applied in Light mode
+#  only; in Dark mode Streamlit's native dark theme handles it)
+# ============================================================
+
+CSS_TOP = """
 <style>
 
 /* =========================================================
@@ -427,7 +482,9 @@ body,
 }
 
 
-/* =========================================================
+"""
+
+CSS_WIDGETS_LIGHT = """/* =========================================================
    INPUT LABELS
 ========================================================= */
 
@@ -935,7 +992,9 @@ hr {
 }
 
 
-/* =========================================================
+"""
+
+CSS_BOTTOM = """/* =========================================================
    SIDEBAR
 ========================================================= */
 
@@ -1108,9 +1167,12 @@ footer {
 }
 
 </style>
-""",
-    unsafe_allow_html=True
-)
+"""
+
+if st.session_state.theme == "dark":
+    st.markdown(CSS_TOP + CSS_BOTTOM, unsafe_allow_html=True)
+else:
+    st.markdown(CSS_TOP + CSS_WIDGETS_LIGHT + CSS_BOTTOM, unsafe_allow_html=True)
 
 
 # ============================================================
@@ -1175,20 +1237,6 @@ if "page" not in st.session_state:
 
 if st.session_state.page not in PAGES:
     st.session_state.page = PAGES[0]
-
-
-# ============================================================
-# THEME STATE (persists across all pages)
-# ============================================================
-
-THEME_LABELS = {
-    "light": "☀️ Light",
-    "dark": "🌙 Dark"
-}
-
-if "theme" not in st.session_state:
-    saved_theme = st.query_params.get("theme", "light")
-    st.session_state.theme = "dark" if saved_theme == "dark" else "light"
 
 
 # ============================================================
@@ -1424,13 +1472,17 @@ new_theme = "dark" if "Dark" in theme_choice else "light"
 if new_theme != st.session_state.theme:
     st.session_state.theme = new_theme
     st.query_params["theme"] = new_theme
+    apply_native_theme(new_theme)
     st.rerun()
 
-
+st.sidebar.markdown(
+    "<div class='sb-note'>Theme all pages e apply hobe</div>",
+    unsafe_allow_html=True
+)
 
 
 # ============================================================
-# DARK THEME (only injected when Dark is selected)
+# DARK THEME (only custom parts - widgets are native dark)
 # ============================================================
 
 if st.session_state.theme == "dark":
@@ -1455,26 +1507,6 @@ if st.session_state.theme == "dark":
     --line: #263545;
 }
 
-html, body,
-[data-testid="stAppViewContainer"],
-[data-testid="stMain"],
-.stApp {
-    background-color: #0E1621 !important;
-    color: #E6EDF3 !important;
-}
-
-[data-testid="stHeader"] {
-    background-color: #0E1621 !important;
-}
-
-[data-testid="stMain"] p,
-[data-testid="stMain"] li,
-[data-testid="stMain"] .stMarkdown,
-[data-testid="stMain"] .stMarkdown p,
-[data-testid="stMain"] .stMarkdown li {
-    color: #E6EDF3 !important;
-}
-
 [data-testid="stMain"] h1,
 [data-testid="stMain"] h2,
 [data-testid="stMain"] h3,
@@ -1488,7 +1520,7 @@ html, body,
     color: #FFFFFF !important;
 }
 
-/* cards */
+/* custom cards */
 .card {
     background: #16212E !important;
     border-color: #263545 !important;
@@ -1509,107 +1541,6 @@ html, body,
     border-color: #245A3A !important;
 }
 .result-card h1, .result-card h2, .result-card h3, .result-card p { color: #6FD39A !important; }
-
-/* labels & inputs */
-[data-testid="stMain"] label,
-[data-testid="stSelectbox"] label,
-[data-testid="stSelectbox"] label p,
-[data-testid="stSelectbox"] label span,
-[data-testid="stRadio"] label,
-[data-testid="stRadio"] p {
-    color: #E6EDF3 !important;
-}
-
-[data-testid="stMain"] input:not([type="date"]),
-[data-testid="stNumberInput"] input,
-[data-testid="stMain"] textarea,
-[data-baseweb="input"] {
-    background-color: #16212E !important;
-    color: #E6EDF3 !important;
-    caret-color: #E6EDF3 !important;
-    border-color: #33475A !important;
-}
-
-[data-testid="stMain"] [data-baseweb="select"],
-[data-testid="stMain"] [data-baseweb="select"] > div {
-    background-color: #16212E !important;
-    color: #E6EDF3 !important;
-    border-color: #33475A !important;
-}
-
-[data-testid="stMain"] [data-baseweb="select"] div,
-[data-testid="stMain"] [data-baseweb="select"] span,
-[data-testid="stMain"] [data-baseweb="select"] p,
-[data-testid="stMain"] [data-baseweb="select"] input,
-[data-testid="stMain"] [data-baseweb="select"] svg {
-    color: #E6EDF3 !important;
-}
-
-[data-testid="stMain"] [data-baseweb="select"]:focus-within > div {
-    background-color: #16212E !important;
-    border-color: #55D6C2 !important;
-}
-
-[data-baseweb="popover"],
-[data-baseweb="menu"],
-[role="listbox"],
-[role="option"] {
-    background-color: #16212E !important;
-    color: #E6EDF3 !important;
-}
-
-[role="option"]:hover,
-[role="option"][aria-selected="true"] {
-    background-color: #1F3446 !important;
-    color: #FFFFFF !important;
-}
-
-/* date inputs */
-.st-key-prediction_date [data-testid="stDateInput"] > div,
-.st-key-historical_date_range [data-testid="stDateInput"] > div,
-.st-key-prediction_date [data-testid="stDateInput"] input,
-.st-key-historical_date_range [data-testid="stDateInput"] input,
-.st-key-prediction_date [data-testid="stDateInput"] button,
-.st-key-historical_date_range [data-testid="stDateInput"] button {
-    background-color: #16212E !important;
-    color: #E6EDF3 !important;
-}
-
-.st-key-prediction_date [data-testid="stDateInput"] button svg,
-.st-key-historical_date_range [data-testid="stDateInput"] button svg {
-    color: #E6EDF3 !important;
-}
-
-/* buttons */
-.stButton > button {
-    background: #16212E !important;
-    color: #7FE0D2 !important;
-    border-color: #168F87 !important;
-}
-.stButton > button:hover {
-    background: #1F3446 !important;
-}
-.stButton > button[kind="primary"] {
-    background: linear-gradient(135deg, #168F87, #1F9E92) !important;
-    color: #FFFFFF !important;
-}
-
-/* metrics, tables, expanders */
-div[data-testid="stMetric"],
-[data-testid="stDataFrame"],
-[data-testid="stExpander"] {
-    background: #16212E !important;
-    border-color: #263545 !important;
-}
-
-[data-testid="stMetricLabel"],
-[data-testid="stMetricLabel"] * { color: #9FB0BF !important; }
-
-[data-testid="stMetricValue"],
-[data-testid="stMetricValue"] * { color: #7FE0D2 !important; }
-
-[data-testid="stExpander"] p,
-[data-testid="stExpander"] span { color: #E6EDF3 !important; }
 
 hr { border-color: #263545 !important; }
 
