@@ -1576,6 +1576,29 @@ if st.session_state.theme == "dark":
 
 hr { border-color: #263545 !important; }
 
+/* buttons (quick navigation etc.) */
+.stButton > button:not(#x):not([kind="primary"]):not([data-testid="stBaseButton-primary"]) {
+    background: #16212E !important;
+    border: 1.5px solid #2F4A5E !important;
+    color: #E6EDF3 !important;
+}
+.stButton > button:not(#x):not([kind="primary"]):not([data-testid="stBaseButton-primary"]):hover {
+    background: #1F3446 !important;
+    border-color: #55D6C2 !important;
+    color: #7FE0D2 !important;
+}
+.stButton > button[kind="primary"]:not(#x),
+.stButton > button[data-testid="stBaseButton-primary"]:not(#x) {
+    background: linear-gradient(135deg, #168F87, #1F9E92) !important;
+    border: 1.5px solid #55D6C2 !important;
+    color: #FFFFFF !important;
+    box-shadow: 0 4px 14px rgba(22,143,135,0.35) !important;
+}
+.stButton > button[kind="primary"]:not(#x) p,
+.stButton > button[data-testid="stBaseButton-primary"]:not(#x) p {
+    color: #FFFFFF !important;
+}
+
 /* footer */
 .footer { color: #9FB0BF !important; }
 .footer b { color: #E6EDF3 !important; }
@@ -1626,19 +1649,23 @@ RADIO_BOX_CSS = """
 }
 
 /* each option = a box */
-[data-testid="stMain"] [data-testid="stRadio"]:not(#x) div[role="radiogroup"]:not(#x) > label:not(#x) {
+[data-testid="stMain"] [data-testid="stRadio"]:not(#x) label:not(#x) {
     background: __BG__ !important;
     border: 1.5px solid __BORDER__ !important;
     border-radius: 12px !important;
     padding: 0.75rem 1rem !important;
     margin: 0 !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+    display: flex !important;
+    align-items: center !important;
     cursor: pointer !important;
     transition: background 0.18s ease, border-color 0.18s ease,
                 box-shadow 0.18s ease, transform 0.18s ease !important;
 }
 
 /* mouse over -> highlight */
-[data-testid="stMain"] [data-testid="stRadio"]:not(#x) div[role="radiogroup"]:not(#x) > label:not(#x):hover {
+[data-testid="stMain"] [data-testid="stRadio"]:not(#x) label:not(#x):hover {
     background: __HOVER_BG__ !important;
     border-color: __HOVER_BORDER__ !important;
     box-shadow: 0 4px 14px __SHADOW__ !important;
@@ -1646,14 +1673,14 @@ RADIO_BOX_CSS = """
 }
 
 /* selected option */
-[data-testid="stMain"] [data-testid="stRadio"]:not(#x) div[role="radiogroup"]:not(#x) > label:not(#x):has(input:checked) {
+[data-testid="stMain"] [data-testid="stRadio"]:not(#x) label:not(#x):has(input:checked) {
     background: __SEL_BG__ !important;
     border-color: __SEL_BORDER__ !important;
     box-shadow: 0 0 0 1px __SEL_BORDER__ !important;
 }
 
 /* keyboard focus */
-[data-testid="stMain"] [data-testid="stRadio"]:not(#x) div[role="radiogroup"]:not(#x) > label:not(#x):focus-within {
+[data-testid="stMain"] [data-testid="stRadio"]:not(#x) label:not(#x):focus-within {
     border-color: __HOVER_BORDER__ !important;
 }
 
@@ -1735,7 +1762,7 @@ st.markdown(
     }
 
     /* radio boxes: bigger touch target */
-    [data-testid="stMain"] [data-testid="stRadio"]:not(#x) div[role="radiogroup"]:not(#x) > label:not(#x) {
+    [data-testid="stMain"] [data-testid="stRadio"]:not(#x) label:not(#x) {
         min-height: 48px !important;
         padding: 0.8rem 0.9rem !important;
     }
@@ -1879,7 +1906,12 @@ for col, (button_text, target_page) in zip(
     if col.button(
         button_text,
         width="stretch",
-        key=f"quick_nav_{target_page}"
+        key=f"quick_nav_{target_page}",
+        type=(
+            "primary"
+            if st.session_state.page == target_page
+            else "secondary"
+        )
     ):
 
         st.session_state.page = target_page
