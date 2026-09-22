@@ -25,6 +25,16 @@ from services.voice import (
 
 
 # ============================================================
+# VOICE INPUT (STT)
+# ============================================================
+
+from services.voice_input import (
+    prepare_voice_input,
+    voice_input_widget
+)
+
+
+# ============================================================
 # AGRICULTURE SERVICES
 # ============================================================
 
@@ -433,6 +443,35 @@ def voice_date_text(value):
 # ============================================================
 # SECTION TITLE
 # ============================================================
+
+def _voice_input_field(
+    key,
+    prompt,
+    value_type="text",
+    options=None,
+    minimum=None,
+    maximum=None
+):
+    applied = voice_input_widget(
+        key=key,
+        prompt=prompt,
+        value_type=value_type,
+        options=options,
+        minimum=minimum,
+        maximum=maximum
+    )
+
+    # A voice-entered value follows the exact same existing
+    # confirmation -> next-instruction flow as a normal widget change.
+    if applied:
+        input_voice_callback(
+            key,
+            prompt,
+            None
+        )
+
+    return applied
+
 
 def section_title(
     bangla,
@@ -1031,6 +1070,8 @@ def weather_information_section():
 
     with st.container(border=True):
 
+        prepare_voice_input("agriculture_weather_source")
+
         weather_source = st.radio(
             "বৃষ্টির তথ্যের উৎস (Rainfall Source)",
             [
@@ -1045,6 +1086,16 @@ def weather_information_section():
                 "বৃষ্টির তথ্যের উৎস নির্বাচন করুন",
                 None
             )
+        )
+
+        _voice_input_field(
+            "agriculture_weather_source",
+            "বৃষ্টির তথ্যের উৎস বলুন",
+            "option",
+            [
+                "বৃষ্টির পূর্বাভাস ব্যবহার করুন (Use Rain Prediction)",
+                "নিজে বৃষ্টির পরিমাণ দিন (Manual Rainfall Input)"
+            ]
         )
 
 
@@ -1199,6 +1250,8 @@ def weather_information_section():
                 c1, c2 = st.columns(2)
 
 
+                prepare_voice_input("agriculture_prediction_fallback_rain")
+
                 predicted_rain = c1.number_input(
                     "আজকের বৃষ্টির পরিমাণ "
                     "(Today's Rainfall) mm",
@@ -1214,6 +1267,16 @@ def weather_information_section():
                     )
                 )
 
+                with c1:
+                    _voice_input_field(
+                        "agriculture_prediction_fallback_rain",
+                        "আজকের বৃষ্টির পরিমাণ বলুন",
+                        "number",
+                        minimum=0.0
+                    )
+
+
+                prepare_voice_input("agriculture_prediction_fallback_et0")
 
                 et0_value = c2.number_input(
                     "রেফারেন্স বাষ্পীভবন "
@@ -1230,6 +1293,14 @@ def weather_information_section():
                     )
                 )
 
+                with c2:
+                    _voice_input_field(
+                        "agriculture_prediction_fallback_et0",
+                        "রেফারেন্স বাষ্পীভবনের পরিমাণ বলুন",
+                        "number",
+                        minimum=0.0
+                    )
+
 
     # ========================================================
     # MANUAL
@@ -1241,6 +1312,8 @@ def weather_information_section():
 
             c1, c2 = st.columns(2)
 
+
+            prepare_voice_input("agriculture_manual_rain")
 
             predicted_rain = c1.number_input(
                 "আজকের বৃষ্টির পরিমাণ "
@@ -1257,6 +1330,16 @@ def weather_information_section():
                 )
             )
 
+            with c1:
+                _voice_input_field(
+                    "agriculture_manual_rain",
+                    "আজকের বৃষ্টির পরিমাণ বলুন",
+                    "number",
+                    minimum=0.0
+                )
+
+
+            prepare_voice_input("agriculture_manual_et0")
 
             et0_value = c2.number_input(
                 "রেফারেন্স বাষ্পীভবন "
@@ -1272,6 +1355,14 @@ def weather_information_section():
                     None
                 )
             )
+
+            with c2:
+                _voice_input_field(
+                    "agriculture_manual_et0",
+                    "রেফারেন্স বাষ্পীভবনের পরিমাণ বলুন",
+                    "number",
+                    minimum=0.0
+                )
 
 
     return (
@@ -1305,6 +1396,8 @@ def land_information_section():
         # লেখা দেখায় — ঠিক "ফসল নির্বাচন করুন" এর মতো।
         # কৃষক সংখ্যা দিলে তখনই value বসে।
 
+        prepare_voice_input("agriculture_land_area")
+
         land_area = c1.number_input(
             "জমির পরিমাণ (Land Area)",
             min_value=0.01,
@@ -1320,10 +1413,20 @@ def land_information_section():
             )
         )
 
+        with c1:
+            _voice_input_field(
+                "agriculture_land_area",
+                "জমির পরিমাণ বলুন",
+                "number",
+                minimum=0.01
+            )
+
 
         # ----------------------------------------------------
         # AREA UNIT
         # ----------------------------------------------------
+
+        prepare_voice_input("agriculture_area_unit")
 
         area_unit = c2.selectbox(
             "জমির একক (Area Unit)",
@@ -1343,6 +1446,19 @@ def land_information_section():
                 None
             )
         )
+
+        with c2:
+            _voice_input_field(
+                "agriculture_area_unit",
+                "জমির একক বলুন",
+                "option",
+                [
+                    "শতক (Decimal)",
+                    "একর (Acre)",
+                    "হেক্টর (Hectare)",
+                    "বর্গমিটার (Square Meter)"
+                ]
+            )
 
 
         if land_area is None or area_unit is None:
@@ -1399,6 +1515,8 @@ def crop_information_section():
         # CROP
         # ====================================================
 
+        prepare_voice_input("agriculture_crop_select")
+
         crop_label = c1.selectbox(
             "ফসল নির্বাচন করুন (Select Crop)",
             list(crop_options.keys()),
@@ -1412,6 +1530,14 @@ def crop_information_section():
                 None
             )
         )
+
+        with c1:
+            _voice_input_field(
+                "agriculture_crop_select",
+                "ফসলের নাম বলুন",
+                "option",
+                list(crop_options.keys())
+            )
 
 
         # Nothing else is rendered until a crop is actually selected.
@@ -1489,6 +1615,8 @@ def crop_information_section():
             )
 
 
+        prepare_voice_input("agriculture_season_select")
+
         season_label = c2.selectbox(
             "মৌসুম নির্বাচন করুন (Select Season)",
             list(season_options.keys()),
@@ -1502,6 +1630,14 @@ def crop_information_section():
                 None
             )
         )
+
+        with c2:
+            _voice_input_field(
+                "agriculture_season_select",
+                "মৌসুমের নাম বলুন",
+                "option",
+                list(season_options.keys())
+            )
 
 
         if season_label is None:
@@ -1553,6 +1689,8 @@ def planting_growth_section(
         d1, d2 = st.columns(2)
 
 
+        prepare_voice_input("agriculture_calculation_date")
+
         calculation_date = d1.date_input(
             "হিসাবের তারিখ (Calculation Date)",
             value=None,
@@ -1566,6 +1704,15 @@ def planting_growth_section(
             )
         )
 
+        with d1:
+            _voice_input_field(
+                "agriculture_calculation_date",
+                "হিসাবের তারিখ বলুন, যেমন ১৫ সেপ্টেম্বর ২০২৬",
+                "date"
+            )
+
+
+        prepare_voice_input("agriculture_actual_planting_date")
 
         actual_planting_date = d2.date_input(
             "রোপণ/বপনের তারিখ "
@@ -1580,6 +1727,13 @@ def planting_growth_section(
                 None
             )
         )
+
+        with d2:
+            _voice_input_field(
+                "agriculture_actual_planting_date",
+                "রোপণ বা বপনের তারিখ বলুন, যেমন ১০ জুলাই ২০২৬",
+                "date"
+            )
 
 
         if (
@@ -1695,6 +1849,8 @@ def planting_growth_section(
             c1, c2 = st.columns(2)
 
 
+            prepare_voice_input("agriculture_growth_stage")
+
             manual_stage_label = c1.selectbox(
                 "বর্তমান বৃদ্ধি পর্যায় "
                 "(Growth Stage)",
@@ -1713,6 +1869,20 @@ def planting_growth_section(
                     None
                 )
             )
+
+            with c1:
+                _voice_input_field(
+                    "agriculture_growth_stage",
+                    "বৃদ্ধি পর্যায় বলুন",
+                    "option",
+                    [
+                        "স্বয়ংক্রিয় (Automatic)",
+                        "চারা/প্রাথমিক পর্যায় (Initial Stage)",
+                        "বৃদ্ধি পর্যায় (Development Stage)",
+                        "মধ্য পর্যায় (Mid Stage)",
+                        "পরিপক্বতা পর্যায় (Late Stage)"
+                    ]
+                )
 
 
             stage_map = {
@@ -1862,6 +2032,8 @@ def planting_growth_section(
             )
 
 
+            prepare_voice_input("agriculture_growth_stage_fallback")
+
             manual_stage_label = st.selectbox(
                 "বর্তমান বৃদ্ধি পর্যায় "
                 "(Growth Stage)",
@@ -1880,6 +2052,18 @@ def planting_growth_section(
                     "বর্তমান বৃদ্ধি পর্যায় নির্বাচন করুন",
                     None
                 )
+            )
+
+            _voice_input_field(
+                "agriculture_growth_stage_fallback",
+                "বৃদ্ধি পর্যায় বলুন",
+                "option",
+                [
+                    "চারা/প্রাথমিক পর্যায় (Initial Stage)",
+                    "বৃদ্ধি পর্যায় (Development Stage)",
+                    "মধ্য পর্যায় (Mid Stage)",
+                    "পরিপক্বতা পর্যায় (Late Stage)"
+                ]
             )
 
 
@@ -2023,6 +2207,8 @@ def soil_information_section():
 
     with st.container(border=True):
 
+        prepare_voice_input("agriculture_soil_type")
+
         soil_type = st.selectbox(
             "মাটির ধরন (Soil Type)",
             list(SOIL_TYPES.keys()),
@@ -2033,6 +2219,13 @@ def soil_information_section():
                 "মাটির ধরন নির্বাচন করুন",
                 None
             )
+        )
+
+        _voice_input_field(
+            "agriculture_soil_type",
+            "মাটির ধরন বলুন",
+            "option",
+            list(SOIL_TYPES.keys())
         )
 
 
@@ -2077,6 +2270,8 @@ def existing_water_section(
 
     with st.container(border=True):
 
+        prepare_voice_input("agriculture_water_measurement")
+
         water_measurement = st.selectbox(
             "পানির গভীরতা নির্বাচন করুন "
             "(Select Water Depth)",
@@ -2095,6 +2290,15 @@ def existing_water_section(
             )
         )
 
+        _voice_input_field(
+            "agriculture_water_measurement",
+            "পানির গভীরতার ধরন বলুন",
+            "option",
+            list(WATER_DEPTH_OPTIONS.keys()) + [
+                "নিজে পরিমাপ দিন (Custom Measurement)"
+            ]
+        )
+
 
         custom_depth_cm = 0.0
 
@@ -2103,6 +2307,8 @@ def existing_water_section(
             "নিজে পরিমাপ দিন "
             "(Custom Measurement)"
         ):
+
+            prepare_voice_input("agriculture_custom_water_depth")
 
             custom_depth_cm = st.number_input(
                 "পানির গভীরতা সেন্টিমিটারে দিন "
@@ -2117,6 +2323,13 @@ def existing_water_section(
                     "পানির গভীরতা সেন্টিমিটারে দিন",
                     None
                 )
+            )
+
+            _voice_input_field(
+                "agriculture_custom_water_depth",
+                "পানির গভীরতা সেন্টিমিটারে বলুন",
+                "number",
+                minimum=0.0
             )
 
 
@@ -2282,6 +2495,8 @@ def crop_water_requirement_section(
 
     with st.container(border=True):
 
+        prepare_voice_input("agriculture_water_requirement_method")
+
         water_requirement_method = st.radio(
             "পানির চাহিদা নির্ধারণের পদ্ধতি "
             "(Water Requirement Method)",
@@ -2300,6 +2515,16 @@ def crop_water_requirement_section(
                 "পানির চাহিদা নির্ধারণের পদ্ধতি নির্বাচন করুন",
                 None
             )
+        )
+
+        _voice_input_field(
+            "agriculture_water_requirement_method",
+            "পানির চাহিদা নির্ধারণের পদ্ধতি বলুন",
+            "option",
+            [
+                "স্বয়ংক্রিয়ভাবে পানির চাহিদা নির্ধারণ করুন (Automatic — Recommended)",
+                "নিজে দৈনিক পানির চাহিদা দিন (Manual Override)"
+            ]
         )
 
 
@@ -2350,6 +2575,8 @@ def crop_water_requirement_section(
                 ] = default_manual_need
 
 
+            prepare_voice_input("agriculture_manual_crop_water_need")
+
             manual_crop_water_need_mm = st.number_input(
                 "দৈনিক ফসলের পানির চাহিদা "
                 "(Daily Crop Water Requirement) mm/day",
@@ -2362,6 +2589,13 @@ def crop_water_requirement_section(
                     "দৈনিক ফসলের পানির চাহিদা দিন",
                     None
                 )
+            )
+
+            _voice_input_field(
+                "agriculture_manual_crop_water_need",
+                "দৈনিক ফসলের পানির চাহিদা বলুন",
+                "number",
+                minimum=0.0
             )
 
 
@@ -2394,6 +2628,8 @@ def irrigation_system_section():
 
     with st.container(border=True):
 
+        prepare_voice_input("agriculture_irrigation_method")
+
         irrigation_method = st.selectbox(
             "সেচ পদ্ধতি নির্বাচন করুন "
             "(Select Irrigation Method)",
@@ -2409,6 +2645,17 @@ def irrigation_system_section():
                 "সেচ পদ্ধতি নির্বাচন করুন",
                 None
             )
+        )
+
+        _voice_input_field(
+            "agriculture_irrigation_method",
+            "সেচ পদ্ধতির নাম বলুন",
+            "option",
+            [
+                "সাধারণ সেচ (Traditional Irrigation)",
+                "স্প্রিংকলার (Sprinkler)",
+                "ড্রিপ সেচ (Drip Irrigation)"
+            ]
         )
 
 

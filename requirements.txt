@@ -6,3 +6,5 @@ catboost
 plotly
 requests
 gTTS
+streamlit-mic-recorder
+SpeechRecognition
