@@ -1,8 +1,26 @@
 import streamlit as st
 import pandas as pd
+import numpy as np
 import plotly.express as px
 
 from datetime import date
+
+
+# ============================================================
+# AUTO RAINFALL PREDICTION SERVICES
+# Reuse the exact prediction engine from the Rain Prediction page.
+# ============================================================
+
+from services.data_loader import get_station_table
+
+from services.weather_api import build_on_demand_history
+
+from views.prediction import (
+    load_weather_values,
+    create_prediction_features,
+    condition,
+    estimate_rain_probability
+)
 
 
 # ============================================================
@@ -20,7 +38,9 @@ from services.voice import (
     growth_stage_auto_voice,
     render_voice_player,
     process_voice_queue,
-    reset_voice_hash
+    reset_voice_hash,
+    is_voice_enabled,
+    set_voice_enabled
 )
 
 
@@ -71,7 +91,7 @@ def start_agriculture_welcome():
     """
     Agriculture page open হলে:
     1. প্রথমে Welcome voice
-    2. Welcome শেষ হলে "বৃষ্টির তথ্যের উৎস নির্বাচন করুন"
+    2. Welcome শেষ হলে "স্থান ও তারিখ নির্বাচন করুন"
 
     অন্য কোনো input-এর voice page load-এর সময় বাজবে না।
     """
@@ -89,14 +109,55 @@ def start_agriculture_welcome():
     # IMPORTANT:
     # Welcome এবং first instruction একই sequence-এর মধ্যে থাকবে।
     # তাই প্রথমে Welcome শেষ হবে, তারপর instruction বাজবে।
+    #
+    # NOTE: page-এর প্রথম section এখন "স্থান ও তারিখ", তাই welcome-এর
+    # পরের instruction ও সেটাই বলে।
 
     speak_sequence(
         [
             AGRICULTURE_WELCOME_TEXT,
-            "বৃষ্টির তথ্যের উৎস নির্বাচন করুন"
+            "স্থান ও তারিখ নির্বাচন করুন"
         ],
         delay=0.10
     )
+
+
+# ============================================================
+# VOICE ON / OFF TOGGLE (PAGE TOP)
+# ============================================================
+
+def agriculture_voice_toggle():
+    """
+    Page-এর একদম উপরে একটি single ON/OFF বাটন।
+
+    ON:  page-এর সব voice (welcome, section, input confirmation,
+         result, recommendation) স্বাভাবিকভাবে বাজবে।
+    OFF: কোনো voice generate বা play হবে না।
+
+    NOTE:
+    slider/toggle-এ key থাকলে Streamlit widget-এর নিজস্ব session
+    value ব্যবহার করে এবং value= সম্পূর্ণ উপেক্ষা করে (এই ফাইলে
+    irrigation efficiency slider-এও একই সমস্যা আগে হয়েছিল)। তাই
+    widget তৈরি হওয়ার আগেই session_state-এ default বসানো হচ্ছে,
+    value= প্যারামিটার ব্যবহার করা হচ্ছে না।
+    """
+
+    if "agriculture_voice_toggle" not in st.session_state:
+
+        st.session_state[
+            "agriculture_voice_toggle"
+        ] = is_voice_enabled()
+
+    vcol1, vcol2 = st.columns([5, 2])
+
+    with vcol2:
+
+        voice_on = st.toggle(
+            "🔊 ভয়েস (Voice)",
+            key="agriculture_voice_toggle"
+        )
+
+    set_voice_enabled(voice_on)
 
 
 # ============================================================
@@ -710,6 +771,7 @@ def _voice_value_text(key, value):
     if key in {
         "agriculture_calculation_date",
         "agriculture_actual_planting_date",
+        "agriculture_prediction_date",
     }:
 
         value_text = voice_date_text(value)
@@ -721,9 +783,56 @@ def _voice_value_text(key, value):
                 f"{value_text} নির্বাচন করা হয়েছে"
             )
 
+        if key == "agriculture_prediction_date":
+
+            return (
+                f"পূর্বাভাসের তারিখ "
+                f"{value_text} নির্বাচন করা হয়েছে"
+            )
+
         return (
             f"রোপণ বা বপনের তারিখ "
             f"{value_text} নির্বাচন করা হয়েছে"
+        )
+
+
+    # ----------------------------------------------------------
+    # STATION / LOCATION
+    # ----------------------------------------------------------
+    #
+    # dropdown-এর value পুরো display_label
+    # ("Station, District (Division)  —  স্টেশন, জেলা (বিভাগ)")।
+    # আগে পুরো Bangla অংশ (স্টেশন, জেলা, বিভাগ) বলা হতো — Dhaka-র
+    # মতো ক্ষেত্রে Station = District = Division same হওয়ায় একই
+    # নাম তিনবার শোনা যেত (যেমন "ঢাকা ঢাকা ঢাকা")। এখন শুধু
+    # প্রথম অংশ (Station-এর Bangla নাম) বলা হবে।
+
+    if key == "agriculture_station":
+
+        raw_value = str(value)
+
+        bn_part = raw_value
+
+        if "—" in raw_value:
+
+            bn_part = raw_value.split(
+                "—"
+            )[-1]
+
+        station_bn = bn_part.split(
+            ","
+        )[0].strip()
+
+        station_text = clean_voice_text(
+            station_bn
+        )
+
+        if not station_text:
+
+            return ""
+
+        return (
+            f"{station_text} নির্বাচন করা হয়েছে"
         )
 
 
@@ -955,6 +1064,11 @@ def input_voice_callback(
 
     6. Irrigation efficiency:
        কোনো voice হবে না।
+
+    7. Crop select:
+       কোনো voice এখান থেকে হবে না — পুরো crop confirmation +
+       rice/non-rice অনুযায়ী পরবর্তী ধাপ crop_information_section()-এ
+       একটি single speak_sequence() call-এ হ্যান্ডেল করা হয়।
     """
 
     value = st.session_state.get(key)
@@ -969,6 +1083,19 @@ def input_voice_callback(
     # --------------------------------------------------------
     # Efficiency-এর কোনো voice একদমই হবে না.
     if key == "agriculture_irrigation_efficiency":
+
+        return
+
+
+    # --------------------------------------------------------
+    # CROP SELECT
+    # --------------------------------------------------------
+    # ফসল নির্বাচনের voice এখন crop_information_section()-এ একটি
+    # combined speak_sequence() হিসেবে হ্যান্ডেল করা হয় (crop
+    # confirmation + rice/non-rice অনুযায়ী পরবর্তী ধাপ)। একই
+    # rerun-এ দুটো আলাদা speak_sequence() call এসে একে অপরকে
+    # overwrite করে ফেলত, তাই generic voice এখানে skip করা হলো।
+    if key == "agriculture_crop_select":
 
         return
 
@@ -1053,6 +1180,522 @@ def input_voice_callback(
 
 
 # ============================================================
+# AGRICULTURE AUTO RAINFALL PREDICTION
+# ============================================================
+
+def auto_predict_agriculture_rainfall(
+    df,
+    model,
+    feature_columns,
+    train_medians,
+    history_days,
+    selected_label,
+    target_date
+):
+    """
+    Automatically predict rainfall for the selected Agriculture station/date.
+
+    The prediction engine is the same one used by views.prediction, so
+    Agriculture and Rain Prediction use identical feature preparation and
+    model logic. The result is stored in st.session_state.rain_prediction,
+    which the existing Agriculture calculations already consume.
+
+    NOTE: `selected_label` here is always the plain English
+    "Station, District (Division)" key (see agriculture_location_date_section
+    below), even though the dropdown the farmer sees also shows a Bangla
+    translation next to it.
+    """
+
+    meta = get_station_table(df).copy()
+
+    if meta.empty:
+        st.error("❌ কোনো station পাওয়া যায়নি।")
+        return None
+
+    if selected_label is None or target_date is None:
+        return None
+
+    station = meta.loc[
+        meta.apply(
+            lambda x: (
+                f"{x['Station']}, "
+                f"{x['District']} "
+                f"({x['Division']})"
+            ),
+            axis=1
+        ) == selected_label
+    ]
+
+    if station.empty:
+        st.error("❌ নির্বাচিত station পাওয়া যায়নি।")
+        return None
+
+    station = station.iloc[0]
+    target = pd.Timestamp(target_date).normalize()
+
+    weather_key = (
+        f"{station['Station_ID']}_"
+        f"{target.strftime('%Y%m%d')}"
+    )
+
+    # Already predicted for this exact station/date -> reuse it.
+    if (
+        st.session_state.get("agriculture_prediction_key") == weather_key
+        and "rain_prediction" in st.session_state
+    ):
+        return station
+
+    # Remove the previous Agriculture prediction before calculating the new one.
+    st.session_state.pop("rain_prediction", None)
+
+    try:
+        with st.spinner("🌦️ Station weather data load হচ্ছে..."):
+            weather_values, weather_error = load_weather_values(
+                station=station,
+                target=target
+            )
+
+        station_df = df[
+            df["Station_ID"] == station["Station_ID"]
+        ].copy()
+
+        base = station_df.median(
+            numeric_only=True
+        ).to_dict()
+
+        if weather_values is None:
+            values = base
+            values["Latitude"] = float(station["Latitude"])
+            values["Longitude"] = float(station["Longitude"])
+            weather_note = (
+                "Weather API পাওয়া যায়নি; station-এর CSV median values ব্যবহার করা হয়েছে।"
+            )
+        else:
+            values = dict(weather_values)
+            weather_note = (
+                "নির্বাচিত তারিখের station weather data ব্যবহার করে automatic prediction করা হয়েছে।"
+            )
+
+        numeric_weather_fields = [
+            "temperature_2m_mean",
+            "temperature_2m_max",
+            "temperature_2m_min",
+            "apparent_temperature_mean",
+            "sunshine_duration",
+            "daylight_duration",
+            "wind_speed_10m_max",
+            "wind_gusts_10m_max",
+            "wind_direction_10m_dominant",
+            "shortwave_radiation_sum",
+            "weather_code",
+            "et0_fao_evapotranspiration"
+        ]
+
+        for col in numeric_weather_fields:
+            value = values.get(col)
+            try:
+                value = float(value)
+            except Exception:
+                value = np.nan
+
+            if pd.isna(value):
+                value = base.get(col, np.nan)
+
+            try:
+                value = float(value)
+            except Exception:
+                value = 0.0
+
+            values[col] = value
+
+        values["Latitude"] = float(
+            values.get("Latitude", station["Latitude"])
+        )
+        values["Longitude"] = float(
+            values.get("Longitude", station["Longitude"])
+        )
+
+        with st.spinner("📚 Historical rainfall features তৈরি হচ্ছে..."):
+            pred_hist, bridge_note = build_on_demand_history(
+                df=df,
+                station=station,
+                target_date=target,
+                history_days=history_days
+            )
+
+        with st.spinner("🤖 Rainfall prediction চলছে..."):
+            X = create_prediction_features(
+                historical_df=pred_hist,
+                station_id=station["Station_ID"],
+                target_date=target,
+                weather_values=values,
+                feature_columns=feature_columns,
+                train_medians=train_medians
+            )
+
+            if X.empty:
+                raise ValueError("Prediction features are empty.")
+
+            if len(X.columns) != len(feature_columns):
+                raise ValueError(
+                    "Feature column count does not match model."
+                )
+
+            X = X.replace([np.inf, -np.inf], np.nan)
+            nan_count = int(X.isna().sum().sum())
+
+            if nan_count > 0:
+                raise ValueError(
+                    f"Prediction features contain {nan_count} NaN values."
+                )
+
+            prediction_array = np.asarray(
+                model.predict(X)
+            ).reshape(-1)
+
+            if len(prediction_array) == 0:
+                raise ValueError("Model returned no prediction.")
+
+            pred = max(
+                float(prediction_array[0]),
+                0.0
+            )
+
+        weather_code = int(
+            round(float(values.get("weather_code", 0)))
+        )
+
+        weather_name, message = condition(
+            code=weather_code,
+            pred=pred
+        )
+
+        rain_probability = estimate_rain_probability(pred)
+
+        try:
+            et0 = float(
+                values.get(
+                    "et0_fao_evapotranspiration",
+                    4.0
+                )
+            )
+        except Exception:
+            et0 = 4.0
+
+        if not np.isfinite(et0):
+            et0 = 4.0
+
+        st.session_state.rain_prediction = {
+            "prediction": pred,
+            "rain_probability": rain_probability,
+            "station": station,
+            "date": target,
+            "weather_values": values,
+            "condition": weather_name,
+            "message": message,
+            "et0": et0,
+            "history_note": bridge_note,
+            "is_future": target.date() > date.today(),
+            "agriculture_auto": True,
+            "weather_note": weather_note,
+            "weather_error": weather_error
+        }
+
+        st.session_state.agriculture_prediction_key = weather_key
+
+        return station
+
+    except Exception as exc:
+        st.session_state.pop("rain_prediction", None)
+        st.session_state.pop("agriculture_prediction_key", None)
+
+        st.error(
+            "❌ Agriculture-এর জন্য automatic rainfall prediction করা যায়নি।"
+        )
+        st.exception(exc)
+        return station
+
+
+# ============================================================
+# LOCATION NAME → BANGLA TRANSLATION
+# ============================================================
+#
+# The station/district/division names in the dataset are in
+# English. The dropdown must show the Bangla name next to it too.
+# These lookup tables cover the divisions, districts and common
+# BMD weather-station names used in Bangladesh.
+#
+# If a name is not found in the table (e.g. an unusual spelling),
+# the ORIGINAL English text is shown instead of crashing — this
+# keeps the page fully safe even for unmapped names.
+# ============================================================
+
+BN_DIVISIONS = {
+    "Dhaka": "ঢাকা",
+    "Chattogram": "চট্টগ্রাম",
+    "Chittagong": "চট্টগ্রাম",
+    "Rajshahi": "রাজশাহী",
+    "Khulna": "খুলনা",
+    "Barisal": "বরিশাল",
+    "Barishal": "বরিশাল",
+    "Sylhet": "সিলেট",
+    "Rangpur": "রংপুর",
+    "Mymensingh": "ময়মনসিংহ",
+}
+
+BN_DISTRICTS = {
+    "Dhaka": "ঢাকা", "Faridpur": "ফরিদপুর", "Gazipur": "গাজীপুর",
+    "Gopalganj": "গোপালগঞ্জ", "Kishoreganj": "কিশোরগঞ্জ",
+    "Madaripur": "মাদারীপুর", "Manikganj": "মানিকগঞ্জ",
+    "Munshiganj": "মুন্সিগঞ্জ", "Narayanganj": "নারায়ণগঞ্জ",
+    "Narsingdi": "নরসিংদী", "Rajbari": "রাজবাড়ী",
+    "Shariatpur": "শরীয়তপুর", "Tangail": "টাঙ্গাইল",
+    "Bogra": "বগুড়া", "Bogura": "বগুড়া", "Joypurhat": "জয়পুরহাট",
+    "Naogaon": "নওগাঁ", "Natore": "নাটোর",
+    "Chapainawabganj": "চাঁপাইনবাবগঞ্জ", "Nawabganj": "চাঁপাইনবাবগঞ্জ",
+    "Pabna": "পাবনা", "Rajshahi": "রাজশাহী", "Sirajganj": "সিরাজগঞ্জ",
+    "Dinajpur": "দিনাজপুর", "Gaibandha": "গাইবান্ধা",
+    "Kurigram": "কুড়িগ্রাম", "Lalmonirhat": "লালমনিরহাট",
+    "Nilphamari": "নীলফামারী", "Panchagarh": "পঞ্চগড়",
+    "Rangpur": "রংপুর", "Thakurgaon": "ঠাকুরগাঁও",
+    "Bagerhat": "বাগেরহাট", "Chuadanga": "চুয়াডাঙ্গা",
+    "Jashore": "যশোর", "Jessore": "যশোর", "Jhenaidah": "ঝিনাইদহ",
+    "Khulna": "খুলনা", "Kushtia": "কুষ্টিয়া", "Magura": "মাগুরা",
+    "Meherpur": "মেহেরপুর", "Narail": "নড়াইল", "Satkhira": "সাতক্ষীরা",
+    "Barguna": "বরগুনা", "Barisal": "বরিশাল", "Barishal": "বরিশাল",
+    "Bhola": "ভোলা", "Jhalokati": "ঝালকাঠি",
+    "Patuakhali": "পটুয়াখালী", "Pirojpur": "পিরোজপুর",
+    "Habiganj": "হবিগঞ্জ", "Moulvibazar": "মৌলভীবাজার",
+    "Sunamganj": "সুনামগঞ্জ", "Sylhet": "সিলেট",
+    "Bandarban": "বান্দরবান", "Brahmanbaria": "ব্রাহ্মণবাড়িয়া",
+    "Chandpur": "চাঁদপুর", "Chattogram": "চট্টগ্রাম",
+    "Chittagong": "চট্টগ্রাম", "Cumilla": "কুমিল্লা", "Comilla": "কুমিল্লা",
+    "Cox's Bazar": "কক্সবাজার", "Coxs Bazar": "কক্সবাজার",
+    "Coxsbazar": "কক্সবাজার", "Feni": "ফেনী",
+    "Khagrachhari": "খাগড়াছড়ি", "Lakshmipur": "লক্ষ্মীপুর",
+    "Noakhali": "নোয়াখালী", "Rangamati": "রাঙ্গামাটি",
+    "Jamalpur": "জামালপুর", "Mymensingh": "ময়মনসিংহ",
+    "Netrokona": "নেত্রকোণা", "Sherpur": "শেরপুর",
+}
+
+BN_STATIONS = {
+    "Dhaka": "ঢাকা", "Faridpur": "ফরিদপুর", "Tangail": "টাঙ্গাইল",
+    "Mymensingh": "ময়মনসিংহ", "Bogra": "বগুড়া", "Rangpur": "রংপুর",
+    "Dinajpur": "দিনাজপুর", "Sylhet": "সিলেট", "Srimangal": "শ্রীমঙ্গল",
+    "Rajshahi": "রাজশাহী", "Ishurdi": "ঈশ্বরদী", "Bagerhat": "বাগেরহাট",
+    "Chuadanga": "চুয়াডাঙ্গা", "Jessore": "যশোর", "Jashore": "যশোর",
+    "Khulna": "খুলনা", "Mongla": "মোংলা", "Satkhira": "সাতক্ষীরা",
+    "Barisal": "বরিশাল", "Barishal": "বরিশাল", "Bhola": "ভোলা",
+    "Patuakhali": "পটুয়াখালী", "Khepupara": "খেপুপাড়া",
+    "Chittagong": "চট্টগ্রাম", "Chattogram": "চট্টগ্রাম",
+    "Comilla": "কুমিল্লা", "Cumilla": "কুমিল্লা",
+    "Cox's Bazar": "কক্সবাজার", "Coxsbazar": "কক্সবাজার",
+    "Feni": "ফেনী", "Hatiya": "হাতিয়া", "Kutubdia": "কুতুবদিয়া",
+    "Maijdee Court": "মাইজদী কোর্ট", "Rangamati": "রাঙ্গামাটি",
+    "Sandwip": "সন্দ্বীপ", "Sitakunda": "সীতাকুণ্ড", "Teknaf": "টেকনাফ",
+    "Chandpur": "চাঁদপুর", "Jamalpur": "জামালপুর",
+    "Madaripur": "মাদারীপুর", "Narail": "নড়াইল",
+    "Netrokona": "নেত্রকোণা", "Sirajganj": "সিরাজগঞ্জ",
+    "Tetulia": "তেঁতুলিয়া", "Panchagarh": "পঞ্চগড়",
+    "Gopalganj": "গোপালগঞ্জ",
+}
+
+
+def _bn_lookup(name, table):
+    """Look up a Bangla translation; fall back to the original text."""
+
+    if name is None:
+        return ""
+
+    key = str(name).strip()
+
+    if key in table:
+        return table[key]
+
+    lowered = key.lower()
+
+    for eng, bn in table.items():
+        if eng.lower() == lowered:
+            return bn
+
+    # No mapping found -> show the original text instead of crashing.
+    return key
+
+
+def build_bn_location_label(station, district, division):
+    """Return a Bangla translation of 'Station, District (Division)'."""
+
+    station_bn = _bn_lookup(station, BN_STATIONS)
+    district_bn = _bn_lookup(district, BN_DISTRICTS)
+    division_bn = _bn_lookup(division, BN_DIVISIONS)
+
+    return f"{station_bn}, {district_bn} ({division_bn})"
+
+
+# ============================================================
+# LOCATION & DATE SECTION
+# ============================================================
+
+def agriculture_location_date_section(
+    df,
+    model,
+    feature_columns,
+    train_medians,
+    history_days
+):
+    """Select Agriculture location/date and create the rainfall prediction."""
+
+    section_title(
+        "স্থান ও তারিখ",
+        "Location & Date"
+    )
+
+    meta = get_station_table(df).copy()
+
+    if meta.empty:
+        st.error("❌ কোনো station পাওয়া যায়নি।")
+        return None, None
+
+    meta["label"] = meta.apply(
+        lambda x: (
+            f"{x['Station']}, "
+            f"{x['District']} "
+            f"({x['Division']})"
+        ),
+        axis=1
+    )
+
+    # Bangla translation shown alongside the English label, so the
+    # farmer sees the location name in Bangla too. The English
+    # "label" stays exactly as before internally, so the matching
+    # logic in auto_predict_agriculture_rainfall() is unaffected.
+    meta["label_bn"] = meta.apply(
+        lambda x: build_bn_location_label(
+            x["Station"],
+            x["District"],
+            x["Division"]
+        ),
+        axis=1
+    )
+
+    meta["display_label"] = (
+        meta["label"] + "  —  " + meta["label_bn"]
+    )
+
+    display_to_label = dict(
+        zip(meta["display_label"], meta["label"])
+    )
+
+    display_labels = sorted(
+        meta["display_label"].tolist()
+    )
+
+    with st.container(border=True):
+        c1, c2 = st.columns(2)
+
+        with c1:
+
+            prepare_voice_input("agriculture_station")
+
+            selected_display_label = st.selectbox(
+                "📍 Location / Station নির্বাচন করুন",
+                display_labels,
+                index=None,
+                key="agriculture_station",
+                on_change=input_voice_callback,
+                args=(
+                    "agriculture_station",
+                    "Location / Station নির্বাচন করুন",
+                    None
+                )
+            )
+
+            _voice_input_field(
+                "agriculture_station",
+                "স্টেশন বা এলাকার নাম বলুন",
+                "option",
+                display_labels
+            )
+
+        with c2:
+
+            prepare_voice_input("agriculture_prediction_date")
+
+            target_date = st.date_input(
+                "তারিখ নির্বাচন করুন (Prediction Date)",
+                value=None,
+                format="YYYY/MM/DD",
+                key="agriculture_prediction_date",
+                on_change=input_voice_callback,
+                args=(
+                    "agriculture_prediction_date",
+                    "পূর্বাভাসের তারিখ নির্বাচন করুন",
+                    None
+                )
+            )
+
+            _voice_input_field(
+                "agriculture_prediction_date",
+                "তারিখ বলুন, যেমন ১৫ সেপ্টেম্বর ২০২৬",
+                "date"
+            )
+
+    selected_label = (
+        display_to_label.get(selected_display_label)
+        if selected_display_label is not None
+        else None
+    )
+
+    if selected_label is None or target_date is None:
+        st.info(
+            "Rainfall prediction-এর জন্য আগে Location এবং Date নির্বাচন করুন।"
+        )
+        st.session_state.pop("rain_prediction", None)
+        st.session_state.pop("agriculture_prediction_key", None)
+        return selected_label, target_date
+
+    selected_station = auto_predict_agriculture_rainfall(
+        df=df,
+        model=model,
+        feature_columns=feature_columns,
+        train_medians=train_medians,
+        history_days=history_days,
+        selected_label=selected_label,
+        target_date=target_date
+    )
+
+    rain_data = st.session_state.get(
+        "rain_prediction",
+        {}
+    )
+
+    if selected_station is not None and rain_data:
+        with st.container(border=True):
+            st.success(
+                f"বৃষ্টির পূর্বাভাস: {bn_num(float(rain_data.get('prediction', 0.0)), 2)} mm"
+            )
+
+            c1, c2, c3 = st.columns(3)
+
+            c1.metric(
+                "Location",
+                selected_display_label
+            )
+
+            c2.metric(
+                "Date",
+                date_text(target_date)
+            )
+
+            c3.metric(
+                "ET0",
+                f"{bn_num(float(rain_data.get('et0', 0.0)), 2)} mm/day"
+            )
+
+    return selected_label, target_date
+
+
+# ============================================================
 # WEATHER SECTION
 # ============================================================
 
@@ -1063,52 +1706,26 @@ def weather_information_section():
         "Weather & Rainfall Information"
     )
 
+    st.session_state.pop("agriculture_weather_source", None)
+
 
     # --------------------------------------------------------
-    # RAINFALL SOURCE  (BOX)
+    # RAINFALL SOURCE
+    # Auto prediction is default. Manual rainfall is optional.
     # --------------------------------------------------------
 
     with st.container(border=True):
 
-        prepare_voice_input("agriculture_weather_source")
-
-        weather_source = st.radio(
-            "বৃষ্টির তথ্যের উৎস (Rainfall Source)",
-            [
-                "বৃষ্টির পূর্বাভাস ব্যবহার করুন (Use Rain Prediction)",
-                "নিজে বৃষ্টির পরিমাণ দিন (Manual Rainfall Input)"
-            ],
-            index=None,
-            key="agriculture_weather_source",
-            on_change=input_voice_callback,
-            args=(
-                "agriculture_weather_source",
-                "বৃষ্টির তথ্যের উৎস নির্বাচন করুন",
-                None
-            )
-        )
-
-        _voice_input_field(
-            "agriculture_weather_source",
-            "বৃষ্টির তথ্যের উৎস বলুন",
-            "option",
-            [
-                "বৃষ্টির পূর্বাভাস ব্যবহার করুন (Use Rain Prediction)",
-                "নিজে বৃষ্টির পরিমাণ দিন (Manual Rainfall Input)"
-            ]
+        manual_selected = st.checkbox(
+            "☐ নিজে বৃষ্টির পরিমাণ দিতে চাই",
+            key="agriculture_manual_rain_choice"
         )
 
 
-        if weather_source is None:
-
-            st.info(
-                "উপরের যেকোনো একটি বক্স নির্বাচন করুন।"
-            )
-
-
-    if weather_source is None:
-
-        return None, 0.0, 0.0
+    if manual_selected:
+        weather_source = "MANUAL"
+    else:
+        weather_source = "AUTO"
 
 
     predicted_rain = 0.0
@@ -1119,9 +1736,7 @@ def weather_information_section():
     # PREDICTION
     # ========================================================
 
-    if weather_source.startswith(
-        "বৃষ্টির পূর্বাভাস"
-    ):
+    if weather_source == "AUTO":
 
         if "rain_prediction" in st.session_state:
 
@@ -1216,6 +1831,27 @@ def weather_information_section():
                 ] = prediction_voice_signature
 
 
+                # ---------------------------------------------
+                # NOTE:
+                #
+                # "বৃষ্টির পূর্বাভাস ব্যবহার করুন" এখন ডিফল্টভাবে
+                # আগে থেকেই নির্বাচিত থাকে (radio index=0), তাই এই
+                # sequence কৃষকের কোনো ক্লিক ছাড়াই বেজে যায়।
+                #
+                # কৃষক চাইলে এর মাঝেই "নিজে বৃষ্টির পরিমাণ দিন"-এ
+                # switch করতে পারেন — সেটা করলে radio-র on_change
+                # সাথে সাথেই fire হয়ে rerun হবে এবং নতুন confirmation
+                # audio (Manual path-এর) পুরনো <audio> element-কে
+                # replace করে দেবে, ফলে এই "জমির পরিমাণ দিন" অংশ
+                # ব্রাউজারে বাজলেও থেমে/replace হয়ে যাবে। তাই আলাদা
+                # server-side wait/re-check লজিক দরকার নেই — শুধু
+                # "আপনি চাইলে নিজে পরিমাপ দিতে পারেন" বলার পর কয়েকটি
+                # PAUSE_TOKEN ("।") দিয়ে ছোট বিরতির অনুভূতি তৈরি করা
+                # হচ্ছে, তারপর পরবর্তী instruction।
+                # ---------------------------------------------
+
+                PAUSE_TOKEN = "।"
+
                 speak_sequence(
                     [
                         (
@@ -1230,6 +1866,12 @@ def weather_information_section():
                             f"{bn_num(et0_value, 2)} "
                             f"মিলিমিটার হতে পারে।"
                         ),
+
+                        "আপনি চাইলে নিজে পরিমাপ দিতে পারেন   অথবা পরবর্তী তথ্য",
+
+                        PAUSE_TOKEN,
+                        PAUSE_TOKEN,
+                        PAUSE_TOKEN,
 
                         "জমির পরিমাণ দিন"
                     ],
@@ -1250,24 +1892,25 @@ def weather_information_section():
                 c1, c2 = st.columns(2)
 
 
-                prepare_voice_input("agriculture_prediction_fallback_rain")
-
-                predicted_rain = c1.number_input(
-                    "আজকের বৃষ্টির পরিমাণ "
-                    "(Today's Rainfall) mm",
-                    min_value=0.0,
-                    value=0.0,
-                    step=0.5,
-                    key="agriculture_prediction_fallback_rain",
-                    on_change=input_voice_callback,
-                    args=(
-                        "agriculture_prediction_fallback_rain",
-                        "আজকের বৃষ্টির পরিমাণ দিন",
-                        None
-                    )
-                )
-
                 with c1:
+
+                    prepare_voice_input("agriculture_prediction_fallback_rain")
+
+                    predicted_rain = st.number_input(
+                        "আজকের বৃষ্টির পরিমাণ "
+                        "(Today's Rainfall) mm",
+                        min_value=0.0,
+                        value=0.0,
+                        step=0.5,
+                        key="agriculture_prediction_fallback_rain",
+                        on_change=input_voice_callback,
+                        args=(
+                            "agriculture_prediction_fallback_rain",
+                            "আজকের বৃষ্টির পরিমাণ দিন",
+                            None
+                        )
+                    )
+
                     _voice_input_field(
                         "agriculture_prediction_fallback_rain",
                         "আজকের বৃষ্টির পরিমাণ বলুন",
@@ -1276,24 +1919,25 @@ def weather_information_section():
                     )
 
 
-                prepare_voice_input("agriculture_prediction_fallback_et0")
-
-                et0_value = c2.number_input(
-                    "রেফারেন্স বাষ্পীভবন "
-                    "(ET0 / Reference Evapotranspiration) mm/day",
-                    min_value=0.0,
-                    value=4.0,
-                    step=0.1,
-                    key="agriculture_prediction_fallback_et0",
-                    on_change=input_voice_callback,
-                    args=(
-                        "agriculture_prediction_fallback_et0",
-                        "রেফারেন্স বাষ্পীভবনের পরিমাণ দিন",
-                        None
-                    )
-                )
-
                 with c2:
+
+                    prepare_voice_input("agriculture_prediction_fallback_et0")
+
+                    et0_value = st.number_input(
+                        "রেফারেন্স বাষ্পীভবন "
+                        "(ET0 / Reference Evapotranspiration) mm/day",
+                        min_value=0.0,
+                        value=4.0,
+                        step=0.1,
+                        key="agriculture_prediction_fallback_et0",
+                        on_change=input_voice_callback,
+                        args=(
+                            "agriculture_prediction_fallback_et0",
+                            "রেফারেন্স বাষ্পীভবনের পরিমাণ দিন",
+                            None
+                        )
+                    )
+
                     _voice_input_field(
                         "agriculture_prediction_fallback_et0",
                         "রেফারেন্স বাষ্পীভবনের পরিমাণ বলুন",
@@ -1313,24 +1957,25 @@ def weather_information_section():
             c1, c2 = st.columns(2)
 
 
-            prepare_voice_input("agriculture_manual_rain")
-
-            predicted_rain = c1.number_input(
-                "আজকের বৃষ্টির পরিমাণ "
-                "(Today's Rainfall) mm",
-                min_value=0.0,
-                value=0.0,
-                step=0.5,
-                key="agriculture_manual_rain",
-                on_change=input_voice_callback,
-                args=(
-                    "agriculture_manual_rain",
-                    "আজকের বৃষ্টির পরিমাণ দিন",
-                    None
-                )
-            )
-
             with c1:
+
+                prepare_voice_input("agriculture_manual_rain")
+
+                predicted_rain = st.number_input(
+                    "আজকের বৃষ্টির পরিমাণ "
+                    "(Today's Rainfall) mm",
+                    min_value=0.0,
+                    value=0.0,
+                    step=0.5,
+                    key="agriculture_manual_rain",
+                    on_change=input_voice_callback,
+                    args=(
+                        "agriculture_manual_rain",
+                        "আজকের বৃষ্টির পরিমাণ দিন",
+                        None
+                    )
+                )
+
                 _voice_input_field(
                     "agriculture_manual_rain",
                     "আজকের বৃষ্টির পরিমাণ বলুন",
@@ -1339,24 +1984,25 @@ def weather_information_section():
                 )
 
 
-            prepare_voice_input("agriculture_manual_et0")
-
-            et0_value = c2.number_input(
-                "রেফারেন্স বাষ্পীভবন "
-                "(ET0 / Reference Evapotranspiration) mm/day",
-                min_value=0.0,
-                value=4.0,
-                step=0.1,
-                key="agriculture_manual_et0",
-                on_change=input_voice_callback,
-                args=(
-                    "agriculture_manual_et0",
-                    "রেফারেন্স বাষ্পীভবনের পরিমাণ দিন",
-                    None
-                )
-            )
-
             with c2:
+
+                prepare_voice_input("agriculture_manual_et0")
+
+                et0_value = st.number_input(
+                    "রেফারেন্স বাষ্পীভবন "
+                    "(ET0 / Reference Evapotranspiration) mm/day",
+                    min_value=0.0,
+                    value=4.0,
+                    step=0.1,
+                    key="agriculture_manual_et0",
+                    on_change=input_voice_callback,
+                    args=(
+                        "agriculture_manual_et0",
+                        "রেফারেন্স বাষ্পীভবনের পরিমাণ দিন",
+                        None
+                    )
+                )
+
                 _voice_input_field(
                     "agriculture_manual_et0",
                     "রেফারেন্স বাষ্পীভবনের পরিমাণ বলুন",
@@ -1396,24 +2042,25 @@ def land_information_section():
         # লেখা দেখায় — ঠিক "ফসল নির্বাচন করুন" এর মতো।
         # কৃষক সংখ্যা দিলে তখনই value বসে।
 
-        prepare_voice_input("agriculture_land_area")
-
-        land_area = c1.number_input(
-            "জমির পরিমাণ (Land Area)",
-            min_value=0.01,
-            value=None,
-            step=0.01,
-            placeholder="জমির পরিমাণ লিখুন",
-            key="agriculture_land_area",
-            on_change=input_voice_callback,
-            args=(
-                "agriculture_land_area",
-                "জমির পরিমাণ দিন",
-                None
-            )
-        )
-
         with c1:
+
+            prepare_voice_input("agriculture_land_area")
+
+            land_area = st.number_input(
+                "জমির পরিমাণ (Land Area)",
+                min_value=0.01,
+                value=None,
+                step=0.01,
+                placeholder="জমির পরিমাণ লিখুন",
+                key="agriculture_land_area",
+                on_change=input_voice_callback,
+                args=(
+                    "agriculture_land_area",
+                    "জমির পরিমাণ দিন",
+                    None
+                )
+            )
+
             _voice_input_field(
                 "agriculture_land_area",
                 "জমির পরিমাণ বলুন",
@@ -1426,28 +2073,29 @@ def land_information_section():
         # AREA UNIT
         # ----------------------------------------------------
 
-        prepare_voice_input("agriculture_area_unit")
-
-        area_unit = c2.selectbox(
-            "জমির একক (Area Unit)",
-            [
-                "শতক (Decimal)",
-                "একর (Acre)",
-                "হেক্টর (Hectare)",
-                "বর্গমিটার (Square Meter)"
-            ],
-            index=None,
-            placeholder="জমির একক নির্বাচন করুন",
-            key="agriculture_area_unit",
-            on_change=input_voice_callback,
-            args=(
-                "agriculture_area_unit",
-                "জমির একক নির্বাচন করুন",
-                None
-            )
-        )
-
         with c2:
+
+            prepare_voice_input("agriculture_area_unit")
+
+            area_unit = st.selectbox(
+                "জমির একক (Area Unit)",
+                [
+                    "শতক (Decimal)",
+                    "একর (Acre)",
+                    "হেক্টর (Hectare)",
+                    "বর্গমিটার (Square Meter)"
+                ],
+                index=None,
+                placeholder="জমির একক নির্বাচন করুন",
+                key="agriculture_area_unit",
+                on_change=input_voice_callback,
+                args=(
+                    "agriculture_area_unit",
+                    "জমির একক নির্বাচন করুন",
+                    None
+                )
+            )
+
             _voice_input_field(
                 "agriculture_area_unit",
                 "জমির একক বলুন",
@@ -1515,23 +2163,24 @@ def crop_information_section():
         # CROP
         # ====================================================
 
-        prepare_voice_input("agriculture_crop_select")
-
-        crop_label = c1.selectbox(
-            "ফসল নির্বাচন করুন (Select Crop)",
-            list(crop_options.keys()),
-            index=None,
-            placeholder="ফসল নির্বাচন করুন",
-            key="agriculture_crop_select",
-            on_change=input_voice_callback,
-            args=(
-                "agriculture_crop_select",
-                "ফসল নির্বাচন করুন",
-                None
-            )
-        )
-
         with c1:
+
+            prepare_voice_input("agriculture_crop_select")
+
+            crop_label = st.selectbox(
+                "ফসল নির্বাচন করুন (Select Crop)",
+                list(crop_options.keys()),
+                index=None,
+                placeholder="ফসল নির্বাচন করুন",
+                key="agriculture_crop_select",
+                on_change=input_voice_callback,
+                args=(
+                    "agriculture_crop_select",
+                    "ফসল নির্বাচন করুন",
+                    None
+                )
+            )
+
             _voice_input_field(
                 "agriculture_crop_select",
                 "ফসলের নাম বলুন",
@@ -1580,6 +2229,11 @@ def crop_information_section():
                 None
             )
 
+            st.session_state.pop(
+                "agriculture_crop_voice_signature",
+                None
+            )
+
 
         st.session_state[
             "agriculture_previous_crop"
@@ -1615,49 +2269,132 @@ def crop_information_section():
             )
 
 
-        prepare_voice_input("agriculture_season_select")
+        # ----------------------------------------------------
+        # ধান (Rice) → কৃষক নিজে মৌসুম নির্বাচন করবেন।
+        # অন্য সব ফসল → একটি মাত্র মৌসুম নিজে থেকেই নির্বাচিত হবে।
+        # ----------------------------------------------------
 
-        season_label = c2.selectbox(
-            "মৌসুম নির্বাচন করুন (Select Season)",
-            list(season_options.keys()),
-            index=None,
-            placeholder="মৌসুম নির্বাচন করুন",
-            key="agriculture_season_select",
-            on_change=input_voice_callback,
-            args=(
-                "agriculture_season_select",
-                "মৌসুম নির্বাচন করুন",
-                None
+        is_rice = crop_label.startswith("ধান")
+
+
+        # ----------------------------------------------------
+        # CROP SELECTION VOICE (COMBINED, SINGLE CALL)
+        # ----------------------------------------------------
+        #
+        # আগে crop select-এর voice দুই জায়গা থেকে আলাদাভাবে
+        # generate হতো — (১) on_change callback থেকে generic
+        # confirmation, (২) non-rice ফসলের জন্য আলাদা auto-season
+        # speak_sequence()। voice player-এ একবারে একটাই audio
+        # slot থাকায় দ্বিতীয় call প্রথমটাকে overwrite করে ফেলত,
+        # ফলে "{ফসল} নির্বাচন করা হয়েছে" কখনো শোনা যেত না এবং
+        # non-rice-এর ক্ষেত্রে পরের instruction ("হিসাবের তারিখ
+        # নির্বাচন করুন")-ও কখনো বলা হতো না।
+        #
+        # এখন পুরো chain (crop confirmation + rice হলে "মৌসুম
+        # নির্বাচন করুন" / non-rice হলে auto-season announce +
+        # "হিসাবের তারিখ নির্বাচন করুন") একটি মাত্র speak_sequence()
+        # call-এ পাঠানো হচ্ছে, crop_label পরিবর্তন হলে ঠিক একবার।
+
+        crop_voice_signature = crop_label
+
+        crop_voice_already_spoken = (
+            st.session_state.get(
+                "agriculture_crop_voice_signature"
             )
+            == crop_voice_signature
         )
 
-        with c2:
-            _voice_input_field(
-                "agriculture_season_select",
-                "মৌসুমের নাম বলুন",
-                "option",
-                list(season_options.keys())
-            )
+
+        if is_rice:
+
+            if not crop_voice_already_spoken:
+
+                st.session_state[
+                    "agriculture_crop_voice_signature"
+                ] = crop_voice_signature
+
+                speak_sequence(
+                    [
+                        f"{clean_voice_text(crop_label)} নির্বাচন করা হয়েছে",
+                        "মৌসুম নির্বাচন করুন"
+                    ],
+                    delay=0.10
+                )
+
+            with c2:
+
+                prepare_voice_input("agriculture_season_select")
+
+                season_label = st.selectbox(
+                    "মৌসুম নির্বাচন করুন (Select Season)",
+                    list(season_options.keys()),
+                    index=None,
+                    placeholder="মৌসুম নির্বাচন করুন",
+                    key="agriculture_season_select",
+                    on_change=input_voice_callback,
+                    args=(
+                        "agriculture_season_select",
+                        "মৌসুম নির্বাচন করুন",
+                        None
+                    )
+                )
+
+                _voice_input_field(
+                    "agriculture_season_select",
+                    "মৌসুমের নাম বলুন",
+                    "option",
+                    list(season_options.keys())
+                )
 
 
-        if season_label is None:
+            if season_label is None:
 
-            st.info(
-                "মৌসুম নির্বাচন করুন।"
-            )
+                st.info(
+                    "মৌসুম নির্বাচন করুন।"
+                )
 
-            return (
-                crop_label,
-                crop_name,
-                None,
-                None,
-                True
-            )
+                return (
+                    crop_label,
+                    crop_name,
+                    None,
+                    None,
+                    True
+                )
 
 
-        season_name = season_options[
-            season_label
-        ]
+            season_name = season_options[season_label]
+
+
+        else:
+
+            # শুধুমাত্র একটি মৌসুম উপলব্ধ থাকায় সেটিই
+            # নিজে নিজে নির্বাচিত হয় — কৃষককে আলাদা করে
+            # কিছু নির্বাচন করতে হয় না।
+
+            season_label = list(season_options.keys())[0]
+            season_name = season_options[season_label]
+
+            if not crop_voice_already_spoken:
+
+                st.session_state[
+                    "agriculture_crop_voice_signature"
+                ] = crop_voice_signature
+
+                speak_sequence(
+                    [
+                        f"{clean_voice_text(crop_label)} নির্বাচন করা হয়েছে",
+                        f"{clean_voice_text(season_label)} "
+                        f"মৌসুম স্বয়ংক্রিয়ভাবে নির্বাচন করা হয়েছে।",
+                        "হিসাবের তারিখ নির্বাচন করুন"
+                    ],
+                    delay=0.10
+                )
+
+            with c2:
+
+                st.info(
+                    f"মৌসুম (Season): {season_label}"
+                )
 
 
     return (
@@ -1689,22 +2426,23 @@ def planting_growth_section(
         d1, d2 = st.columns(2)
 
 
-        prepare_voice_input("agriculture_calculation_date")
-
-        calculation_date = d1.date_input(
-            "হিসাবের তারিখ (Calculation Date)",
-            value=None,
-            format="YYYY/MM/DD",
-            key="agriculture_calculation_date",
-            on_change=input_voice_callback,
-            args=(
-                "agriculture_calculation_date",
-                "হিসাবের তারিখ নির্বাচন করুন",
-                None
-            )
-        )
-
         with d1:
+
+            prepare_voice_input("agriculture_calculation_date")
+
+            calculation_date = st.date_input(
+                "হিসাবের তারিখ (Calculation Date)",
+                value=None,
+                format="YYYY/MM/DD",
+                key="agriculture_calculation_date",
+                on_change=input_voice_callback,
+                args=(
+                    "agriculture_calculation_date",
+                    "হিসাবের তারিখ নির্বাচন করুন",
+                    None
+                )
+            )
+
             _voice_input_field(
                 "agriculture_calculation_date",
                 "হিসাবের তারিখ বলুন, যেমন ১৫ সেপ্টেম্বর ২০২৬",
@@ -1712,23 +2450,24 @@ def planting_growth_section(
             )
 
 
-        prepare_voice_input("agriculture_actual_planting_date")
-
-        actual_planting_date = d2.date_input(
-            "রোপণ/বপনের তারিখ "
-            "(Planting / Sowing Date)",
-            value=None,
-            format="YYYY/MM/DD",
-            key="agriculture_actual_planting_date",
-            on_change=input_voice_callback,
-            args=(
-                "agriculture_actual_planting_date",
-                "রোপণ বা বপনের তারিখ নির্বাচন করুন",
-                None
-            )
-        )
-
         with d2:
+
+            prepare_voice_input("agriculture_actual_planting_date")
+
+            actual_planting_date = st.date_input(
+                "রোপণ/বপনের তারিখ "
+                "(Planting / Sowing Date)",
+                value=None,
+                format="YYYY/MM/DD",
+                key="agriculture_actual_planting_date",
+                on_change=input_voice_callback,
+                args=(
+                    "agriculture_actual_planting_date",
+                    "রোপণ বা বপনের তারিখ নির্বাচন করুন",
+                    None
+                )
+            )
+
             _voice_input_field(
                 "agriculture_actual_planting_date",
                 "রোপণ বা বপনের তারিখ বলুন, যেমন ১০ জুলাই ২০২৬",
@@ -1849,28 +2588,29 @@ def planting_growth_section(
             c1, c2 = st.columns(2)
 
 
-            prepare_voice_input("agriculture_growth_stage")
-
-            manual_stage_label = c1.selectbox(
-                "বর্তমান বৃদ্ধি পর্যায় "
-                "(Growth Stage)",
-                [
-                    "স্বয়ংক্রিয় (Automatic)",
-                    "চারা/প্রাথমিক পর্যায় (Initial Stage)",
-                    "বৃদ্ধি পর্যায় (Development Stage)",
-                    "মধ্য পর্যায় (Mid Stage)",
-                    "পরিপক্বতা পর্যায় (Late Stage)"
-                ],
-                key="agriculture_growth_stage",
-                on_change=input_voice_callback,
-                args=(
-                    "agriculture_growth_stage",
-                    "বর্তমান বৃদ্ধি পর্যায় নির্বাচন করুন",
-                    None
-                )
-            )
-
             with c1:
+
+                prepare_voice_input("agriculture_growth_stage")
+
+                manual_stage_label = st.selectbox(
+                    "বর্তমান বৃদ্ধি পর্যায় "
+                    "(Growth Stage)",
+                    [
+                        "স্বয়ংক্রিয় (Automatic)",
+                        "চারা/প্রাথমিক পর্যায় (Initial Stage)",
+                        "বৃদ্ধি পর্যায় (Development Stage)",
+                        "মধ্য পর্যায় (Mid Stage)",
+                        "পরিপক্বতা পর্যায় (Late Stage)"
+                    ],
+                    key="agriculture_growth_stage",
+                    on_change=input_voice_callback,
+                    args=(
+                        "agriculture_growth_stage",
+                        "বর্তমান বৃদ্ধি পর্যায় নির্বাচন করুন",
+                        None
+                    )
+                )
+
                 _voice_input_field(
                     "agriculture_growth_stage",
                     "বৃদ্ধি পর্যায় বলুন",
@@ -2127,70 +2867,71 @@ def crop_reference_section(
     season_label,
     crop_reference
 ):
+    """
+    ফসলের রেফারেন্স তথ্য।
+
+    আগে এটি একটি expander (ক্লিক করে খোলা) হিসেবে ছিল, যা দেখতে
+    dropdown/option-এর মতো লাগছিল। এখন এটি সরাসরি একটি auto-visible
+    card হিসেবে দেখানো হয় — বাকি "love card" (.agri-card) গুলোর
+    মতোই — ক্লিক করার দরকার নেই।
+    """
 
     if not crop_reference:
 
         return
 
 
-    with st.expander(
-        "ফসলের রেফারেন্স তথ্য "
-        "(Crop Reference Information)"
-    ):
+    cultivar = crop_reference.get("cultivar") or "N/A"
 
-        st.write(
-            f"ফসল (Crop): {crop_label}"
+
+    duration_row = ""
+
+    if crop_reference.get("duration_days") is not None:
+
+        duration_row = (
+            f"<p>রেফারেন্স সময়কাল (Reference Duration): "
+            f"{bn_num(crop_reference['duration_days'], 0)} দিন</p>"
         )
 
 
-        st.write(
-            f"মৌসুম (Season): {season_label}"
+    cwr_row = ""
+
+    if crop_reference.get("cwr_mm") is not None:
+
+        cwr_row = (
+            f"<p>মৌসুমি ফসলের পানির চাহিদা (Seasonal CWR Reference): "
+            f"{bn_num(crop_reference['cwr_mm'], 0)} mm/season</p>"
         )
 
 
-        st.write(
-            f"জাত (Cultivar): "
-            f"{crop_reference.get('cultivar') or 'N/A'}"
+    iwr_row = ""
+
+    if crop_reference.get("iwr_mm") is not None:
+
+        iwr_row = (
+            f"<p>মৌসুমি সেচের রেফারেন্স (Seasonal IWR Reference): "
+            f"{bn_num(crop_reference['iwr_mm'], 0)} mm/season</p>"
         )
 
 
-        if crop_reference.get(
-            "duration_days"
-        ) is not None:
-
-            st.write(
-                f"রেফারেন্স সময়কাল "
-                f"(Reference Duration): "
-                f"{bn_num(crop_reference['duration_days'], 0)} দিন"
-            )
-
-
-        if crop_reference.get(
-            "cwr_mm"
-        ) is not None:
-
-            st.write(
-                f"মৌসুমি ফসলের পানির চাহিদা "
-                f"(Seasonal CWR Reference): "
-                f"{bn_num(crop_reference['cwr_mm'], 0)} mm/season"
-            )
-
-
-        if crop_reference.get(
-            "iwr_mm"
-        ) is not None:
-
-            st.write(
-                f"মৌসুমি সেচের রেফারেন্স "
-                f"(Seasonal IWR Reference): "
-                f"{bn_num(crop_reference['iwr_mm'], 0)} mm/season"
-            )
-
-
-        st.caption(
-            "নোট: CWR/IWR এখানে seasonal reference। "
-            "এগুলো আজকের daily irrigation requirement নয়।"
-        )
+    st.markdown(
+        f"""
+        <div class='agri-card'>
+            <h3>ফসলের রেফারেন্স তথ্য (Crop Reference Information)</h3>
+            <p>ফসল (Crop): {crop_label}</p>
+            <p>মৌসুম (Season): {season_label}</p>
+            <p>জাত (Cultivar): {cultivar}</p>
+            {duration_row}
+            {cwr_row}
+            {iwr_row}
+            <p style="font-size:13px; opacity:.75; margin-top:8px;">
+                নোট: CWR/IWR এখানে seasonal reference। এগুলো আজকের
+                daily irrigation requirement নয়।
+            </p>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
 
 
 # ============================================================
@@ -4060,7 +4801,13 @@ def show_agriculture_result():
 # MAIN AGRICULTURE PAGE
 # ============================================================
 
-def show_agriculture():
+def show_agriculture(
+    df,
+    model,
+    feature_columns,
+    train_medians,
+    history_days
+):
 
     # ========================================================
     # STYLES
@@ -4068,6 +4815,13 @@ def show_agriculture():
     # প্রতিটি rerun-এ inject করতে হবে।
 
     inject_agriculture_styles()
+
+
+    # ========================================================
+    # VOICE ON / OFF (page-এর একদম উপরে)
+    # ========================================================
+
+    agriculture_voice_toggle()
 
 
     # ========================================================
@@ -4106,6 +4860,19 @@ def show_agriculture():
         </div>
         """,
         unsafe_allow_html=True
+    )
+
+
+    # ========================================================
+    # LOCATION & DATE + AUTOMATIC RAINFALL PREDICTION
+    # ========================================================
+
+    agriculture_location_date_section(
+        df=df,
+        model=model,
+        feature_columns=feature_columns,
+        train_medians=train_medians,
+        history_days=history_days
     )
 
 

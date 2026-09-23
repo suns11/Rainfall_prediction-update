@@ -1865,7 +1865,15 @@ elif page == "🔮 Rain Prediction":
 
 
 elif page == "🌱 Agriculture Irrigation (কৃষি সেচ ব্যবস্থা)":
-    show_agriculture()
+    
+    show_agriculture(
+        df=df,
+        model=model,
+        feature_columns=feature_columns,
+        train_medians=train_medians,
+        history_days=HISTORY_DAYS
+    )
+
 
 
 elif page == "📂 Historical Data":

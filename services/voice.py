@@ -1,9 +1,6 @@
-# services/voice.py
-
 import io
 import re
 import hashlib
-
 import streamlit as st
 from gtts import gTTS
 
@@ -18,11 +15,39 @@ def _init_voice_state():
         "voice_version": 0,
         "voice_rendered_version": -1,
         "voice_hash": None,
+        "voice_enabled": True,
     }
 
     for key, value in defaults.items():
         if key not in st.session_state:
             st.session_state[key] = value
+
+
+# ============================================================
+# GLOBAL VOICE ON / OFF SWITCH
+# ============================================================
+#
+# One master switch for the whole Agriculture page.
+#
+# When OFF:
+#   - speak_sequence() will not generate any new audio.
+#   - render_voice_player() will not play/embed any audio.
+#
+# This is intentionally the ONLY place every voice helper in
+# this file funnels through (speak_sequence), so turning this
+# switch off silences welcome voice, section voice, input
+# confirmation voice, result voice and recommendation voice
+# all at once, without touching any of that existing logic.
+# ============================================================
+
+def is_voice_enabled():
+    _init_voice_state()
+    return bool(st.session_state.get("voice_enabled", True))
+
+
+def set_voice_enabled(enabled):
+    _init_voice_state()
+    st.session_state["voice_enabled"] = bool(enabled)
 
 
 # ============================================================
@@ -60,7 +85,11 @@ def clean_voice_text(text):
     # HTML / TAG REMOVE
     # --------------------------------------------------------
 
-    text = re.sub(r"<[^>]+>", " ", text)
+    text = re.sub(
+        r"<[^>]+>",
+        " ",
+        text
+    )
 
     # --------------------------------------------------------
     # URL / EMAIL REMOVE
@@ -94,7 +123,7 @@ def clean_voice_text(text):
     # --------------------------------------------------------
 
     text = re.sub(
-        r"[_|/\\]+",
+        r"[_/*\\]+",
         " ",
         text
     )
@@ -125,6 +154,7 @@ def clean_voice_text(text):
     # --------------------------------------------------------
     # EMPTY BRACKETS
     # --------------------------------------------------------
+
     # English বাদ দেওয়ার পর "( )" পড়ে থাকে।
     # gTTS-এ এগুলো অপ্রয়োজনীয় বিরতি তৈরি করে।
 
@@ -211,7 +241,6 @@ def _generate_audio(text):
         )
 
         tts.write_to_fp(audio_buffer)
-
         audio_buffer.seek(0)
 
         return audio_buffer.getvalue()
@@ -235,9 +264,20 @@ def speak_sequence(messages, delay=0.0):
         - সব message একসাথে একটি Bangla audio-তে যাবে
         - English UI words বাদ যাবে
         - duplicate audio regeneration এড়ানো হবে
+
+    NOTE:
+        এই একটি function-ই পুরো page-এর সব voice call
+        (welcome, section, input confirmation, result,
+        recommendation) এর জন্য single entry point। তাই
+        global voice ON/OFF switch এখানে চেক করলেই পুরো
+        page-এর voice mute/unmute হয়ে যায়, আলাদা করে অন্য
+        কোনো function বদলাতে হয় না।
     """
 
     _init_voice_state()
+
+    if not is_voice_enabled():
+        return
 
     if not messages:
         return
@@ -245,7 +285,6 @@ def speak_sequence(messages, delay=0.0):
     prepared_messages = []
 
     for message in messages:
-
         cleaned = _prepare_voice_text(message)
 
         if cleaned:
@@ -289,11 +328,8 @@ def reset_voice_hash():
     একই text আবার বাজাতে হলে (যেমন Calculate বা
     Smart Recommendation বাটনে দ্বিতীয়বার চাপ দিলে)
     speak_sequence() আগের hash দেখে চুপ করে থাকত।
-    এই helper সেই hash মুছে দেয়।
 
-    আগে page থেকে সরাসরি
-        st.session_state["voice_hash"] = None
-    লেখা হতো। এখন সেটি এখানে কেন্দ্রীভূত।
+    এই helper সেই hash মুছে দেয়।
     """
 
     _init_voice_state()
@@ -319,7 +355,6 @@ def growth_stage_auto_voice(
     পরের কোনো instruction বাজত না।
 
     PAUSE_TOKEN ("।") gTTS-এ একটি ছোট বিরতি তৈরি করে।
-    তিনটি token ≈ ২-৩ সেকেন্ড বিরতি দেয়।
     """
 
     if not stage_label:
@@ -333,7 +368,6 @@ def growth_stage_auto_voice(
     ]
 
     if next_instruction:
-
         messages.extend([
             PAUSE_TOKEN,
             PAUSE_TOKEN,
@@ -341,7 +375,10 @@ def growth_stage_auto_voice(
             next_instruction
         ])
 
-    speak_sequence(messages, delay=0.10)
+    speak_sequence(
+        messages,
+        delay=0.10
+    )
 
 
 # ============================================================
@@ -371,7 +408,6 @@ def agriculture_result_voice(
     # --------------------------------------------------------
 
     if irrigation_needed:
-
         messages.append(
             f"আজ আপনার জমিতে সেচ প্রয়োজন। "
             f"প্রায় {water_liters:.0f} লিটার পানি "
@@ -379,7 +415,6 @@ def agriculture_result_voice(
         )
 
     else:
-
         messages.append(
             "আজ আপনার জমিতে অতিরিক্ত সেচ দেওয়ার প্রয়োজন নেই। "
             "জমিতে থাকা পানি এবং বৃষ্টির পানি "
@@ -391,7 +426,6 @@ def agriculture_result_voice(
     # --------------------------------------------------------
 
     if irrigation_needed:
-
         messages.append(
             f"জমিতে থাকা পানি {available_water:.1f} মিলিমিটার "
             f"এবং কার্যকর বৃষ্টির পানি {effective_rain:.1f} মিলিমিটার। "
@@ -402,6 +436,7 @@ def agriculture_result_voice(
     # --------------------------------------------------------
     # 3. NO RAIN DECISION
     # --------------------------------------------------------
+
     # এই message result card-এও হুবহু লেখা দেখানো হয়।
 
     if no_rain_message:
@@ -412,12 +447,6 @@ def agriculture_result_voice(
 
 # ============================================================
 # SMART RECOMMENDATION VOICE
-# ============================================================
-#
-# NOTE:
-# আগের ফাইলে এই function দুইবার define করা ছিল।
-# Python দ্বিতীয়টিকেই রাখত, প্রথমটি চুপচাপ overwrite হয়ে যেত।
-# এখন একটিই রাখা হয়েছে।
 # ============================================================
 
 def agriculture_recommendation_voice(recommendations):
@@ -559,6 +588,10 @@ def render_voice_player():
     """
 
     _init_voice_state()
+
+    # Global switch OFF থাকলে কোনো audio embed/play হবে না।
+    if not is_voice_enabled():
+        return
 
     audio = st.session_state.get(
         "voice_audio"
