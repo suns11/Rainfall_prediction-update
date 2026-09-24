@@ -43,15 +43,24 @@ STAGE_FROM_LABEL = {
 SOIL_TYPES = {
 
     "বেলে মাটি (Sandy Soil)": {
-        "description": "বেলে মাটিতে পানি দ্রুত নিচে চলে যেতে পারে। প্রয়োজন হলে একবারে বেশি পানি না দিয়ে ভাগ করে সেচ দেওয়া যেতে পারে।"
+        "description": (
+            "বেলে মাটিতে পানি দ্রুত নিচে চলে যেতে পারে। "
+            "প্রয়োজন হলে একবারে বেশি পানি না দিয়ে ভাগ করে সেচ দেওয়া যেতে পারে।"
+        )
     },
 
     "দোআঁশ মাটি (Loamy Soil)": {
-        "description": "দোআঁশ মাটির পানি ধারণক্ষমতা সাধারণত মাঝারি এবং ফসলের জন্য উপযোগী।"
+        "description": (
+            "দোআঁশ মাটির পানি ধারণক্ষমতা সাধারণত মাঝারি "
+            "এবং ফসলের জন্য উপযোগী।"
+        )
     },
 
     "এঁটেল মাটি (Clay Soil)": {
-        "description": "এঁটেল মাটি পানি তুলনামূলক বেশি সময় ধরে রাখতে পারে। সেচের আগে জমিতে পানি জমে আছে কিনা দেখা প্রয়োজন।"
+        "description": (
+            "এঁটেল মাটি পানি তুলনামূলক বেশি সময় ধরে রাখতে পারে। "
+            "সেচের আগে জমিতে পানি জমে আছে কিনা দেখা প্রয়োজন।"
+        )
     }
 
 }
@@ -85,7 +94,6 @@ WATER_DEPTH_OPTIONS = {
 def _read_csv(path):
 
     if not path.exists():
-
         raise FileNotFoundError(
             f"Required agriculture data file not found: {path}"
         )
@@ -259,9 +267,15 @@ def get_crop_reference(crop, season):
         "cultivar": row.get("Cultivar"),
         "start_mm_dd": row.get("Start_MM_DD"),
         "end_mm_dd": row.get("End_MM_DD"),
-        "duration_days": _safe_float(row.get("Reference_Duration_Days")),
-        "cwr_mm": _safe_float(row.get("Bangladesh_Study_CWR_mm")),
-        "iwr_mm": _safe_float(row.get("Bangladesh_Study_IWR_mm")),
+        "duration_days": _safe_float(
+            row.get("Reference_Duration_Days")
+        ),
+        "cwr_mm": _safe_float(
+            row.get("Bangladesh_Study_CWR_mm")
+        ),
+        "iwr_mm": _safe_float(
+            row.get("Bangladesh_Study_IWR_mm")
+        ),
         "source_type": row.get("Source_Type"),
         "source": row.get("Source"),
         "database_status": row.get("Database_Status")
@@ -301,13 +315,19 @@ def get_crop_calendar_record(crop, season):
         "cultivar": row.get("Cultivar"),
         "start_mm_dd": row.get("Start_MM_DD"),
         "end_mm_dd": row.get("End_MM_DD"),
-        "duration_days": _safe_float(row.get("Reference_Duration_Days")),
+        "duration_days": _safe_float(
+            row.get("Reference_Duration_Days")
+        ),
         "source_type": row.get("Source_Type"),
         "source": row.get("Source")
     }
 
 
-def _make_reference_interval(start_mm_dd, end_mm_dd, start_year):
+def _make_reference_interval(
+    start_mm_dd,
+    end_mm_dd,
+    start_year
+):
 
     start_date = _parse_mm_dd(
         start_mm_dd,
@@ -341,7 +361,11 @@ def _make_reference_interval(start_mm_dd, end_mm_dd, start_year):
     return start_date, end_date
 
 
-def resolve_reference_season(crop, season, calculation_date):
+def resolve_reference_season(
+    crop,
+    season,
+    calculation_date
+):
 
     calendar = get_crop_calendar_record(
         crop,
@@ -363,12 +387,9 @@ def resolve_reference_season(crop, season, calculation_date):
 
     if (
         start_raw is None
-        or
-        pd.isna(start_raw)
-        or
-        end_raw is None
-        or
-        pd.isna(end_raw)
+        or pd.isna(start_raw)
+        or end_raw is None
+        or pd.isna(end_raw)
     ):
 
         return {
@@ -495,7 +516,6 @@ def determine_growth_stage(
     if isinstance(calculation_date, datetime):
         calculation_date = calculation_date.date()
 
-
     # ========================================================
     # ACTUAL FARMER PLANTING / TRANSPLANTING DATE
     # ========================================================
@@ -536,9 +556,7 @@ def determine_growth_stage(
             }
 
         day_of_crop = (
-            calculation_date
-            -
-            planting_date
+            calculation_date - planting_date
         ).days + 1
 
         if day_of_crop > int(round(duration_days)):
@@ -550,19 +568,19 @@ def determine_growth_stage(
                 "stage_label": None,
                 "day_of_crop": day_of_crop,
                 "duration_days": duration_days,
-                "progress": day_of_crop / float(duration_days),
+                "progress": (
+                    day_of_crop / float(duration_days)
+                ),
                 "reference_start_date": None,
                 "reference_end_date": None,
                 "message": (
-                    "প্রকৃত রোপণ/বপনের তারিখ অনুযায়ী reference crop duration শেষ হয়ে গেছে। "
-                    "তারিখগুলো আবার যাচাই করুন।"
+                    "প্রকৃত রোপণ/বপনের তারিখ অনুযায়ী reference crop "
+                    "duration শেষ হয়ে গেছে। তারিখগুলো আবার যাচাই করুন।"
                 )
             }
 
         progress = (
-            day_of_crop
-            /
-            float(duration_days)
+            day_of_crop / float(duration_days)
         )
 
         stage = _stage_from_progress(
@@ -605,12 +623,12 @@ def determine_growth_stage(
             "reference_start_date": reference.get("start_date"),
             "reference_end_date": reference.get("end_date"),
             "message": (
-                "কৃষকের দেওয়া প্রকৃত রোপণ/বপনের তারিখ অনুযায়ী Growth Stage নির্ধারণ করা হয়েছে।"
+                "কৃষকের দেওয়া প্রকৃত রোপণ/বপনের তারিখ অনুযায়ী "
+                "Growth Stage নির্ধারণ করা হয়েছে।"
             ),
             "warning": warning,
             "planting_date": planting_date
         }
-
 
     # ========================================================
     # REFERENCE CROP CALENDAR DATE
@@ -653,16 +671,15 @@ def determine_growth_stage(
             "reference_start_date": reference.get("start_date"),
             "reference_end_date": reference.get("end_date"),
             "message": (
-                "নির্বাচিত তারিখটি এই ফসলের reference growing season-এর বাইরে।"
+                "নির্বাচিত তারিখটি এই ফসলের reference growing "
+                "season-এর বাইরে।"
             )
         }
 
     start_date = reference["start_date"]
 
     day_of_crop = (
-        calculation_date
-        -
-        start_date
+        calculation_date - start_date
     ).days + 1
 
     # Calendar end date and reference duration can differ slightly.
@@ -687,7 +704,8 @@ def determine_growth_stage(
         "reference_start_date": reference.get("start_date"),
         "reference_end_date": reference.get("end_date"),
         "message": (
-            "Reference crop calendar অনুযায়ী Growth Stage স্বয়ংক্রিয়ভাবে নির্ধারণ করা হয়েছে।"
+            "Reference crop calendar অনুযায়ী Growth Stage "
+            "স্বয়ংক্রিয়ভাবে নির্ধারণ করা হয়েছে।"
         ),
         "warning": None,
         "planting_date": start_date
@@ -865,15 +883,11 @@ def calculate_existing_water_volume(
     # 1 mm water over 1 square meter = 1 liter
 
     water_liters = (
-        area_m2
-        *
-        water_depth_mm
+        area_m2 * water_depth_mm
     )
 
     water_m3 = (
-        water_liters
-        /
-        1000
+        water_liters / 1000
     )
 
     return {
@@ -900,27 +914,15 @@ def calculate_effective_rainfall(
 
     if predicted_rain_mm <= 5:
 
-        return (
-            predicted_rain_mm
-            *
-            0.90
-        )
+        return predicted_rain_mm * 0.90
 
     elif predicted_rain_mm <= 20:
 
-        return (
-            predicted_rain_mm
-            *
-            0.80
-        )
+        return predicted_rain_mm * 0.80
 
     else:
 
-        return (
-            predicted_rain_mm
-            *
-            0.65
-        )
+        return predicted_rain_mm * 0.65
 
 
 # ============================================================
@@ -960,7 +962,6 @@ def calculate_irrigation(
         area_unit
     )
 
-
     # ========================================================
     # Kc
     # ========================================================
@@ -973,11 +974,11 @@ def calculate_irrigation(
     if kc_record is None:
 
         raise ValueError(
-            f"Kc value পাওয়া যায়নি: Crop={crop_name}, Stage={crop_stage}"
+            f"Kc value পাওয়া যায়নি: Crop={crop_name}, "
+            f"Stage={crop_stage}"
         )
 
     kc = kc_record["kc"]
-
 
     # ========================================================
     # AUTOMATIC CROP WATER REQUIREMENT
@@ -990,11 +991,8 @@ def calculate_irrigation(
     )
 
     automatic_etc_mm = (
-        et0_mm
-        *
-        kc
+        et0_mm * kc
     )
-
 
     # ========================================================
     # WATER REQUIREMENT METHOD
@@ -1015,7 +1013,6 @@ def calculate_irrigation(
 
         water_requirement_method = "AUTOMATIC_ETC"
 
-
     # ========================================================
     # EFFECTIVE RAINFALL
     # ========================================================
@@ -1023,7 +1020,6 @@ def calculate_irrigation(
     effective_rain = calculate_effective_rainfall(
         predicted_rain_mm
     )
-
 
     # ========================================================
     # AVAILABLE WATER
@@ -1033,7 +1029,6 @@ def calculate_irrigation(
         float(existing_water_mm),
         0.0
     )
-
 
     # ========================================================
     # NET IRRIGATION REQUIREMENT
@@ -1048,7 +1043,6 @@ def calculate_irrigation(
         0
     )
 
-
     # ========================================================
     # IRRIGATION EFFICIENCY
     # ========================================================
@@ -1061,17 +1055,13 @@ def calculate_irrigation(
         0.10
     )
 
-
     # ========================================================
     # GROSS IRRIGATION REQUIREMENT
     # ========================================================
 
     gross_water_mm = (
-        net_water_needed
-        /
-        efficiency
+        net_water_needed / efficiency
     )
-
 
     # ========================================================
     # WATER VOLUME
@@ -1080,17 +1070,12 @@ def calculate_irrigation(
     # 1 mm water over 1 m² = 1 liter
 
     water_liters = (
-        gross_water_mm
-        *
-        area_m2
+        gross_water_mm * area_m2
     )
 
     water_m3 = (
-        water_liters
-        /
-        1000
+        water_liters / 1000
     )
-
 
     # ========================================================
     # STATUS
@@ -1104,7 +1089,6 @@ def calculate_irrigation(
 
         status_en = "No irrigation needed today"
 
-
     elif net_water_needed <= 3:
 
         status = "LOW"
@@ -1112,7 +1096,6 @@ def calculate_irrigation(
         status_bn = "অল্প পরিমাণ সেচ দিন"
 
         status_en = "Light irrigation recommended"
-
 
     elif net_water_needed <= 7:
 
@@ -1122,7 +1105,6 @@ def calculate_irrigation(
 
         status_en = "Moderate irrigation recommended"
 
-
     else:
 
         status = "HIGH"
@@ -1130,7 +1112,6 @@ def calculate_irrigation(
         status_bn = "বেশি পরিমাণ সেচ প্রয়োজন"
 
         status_en = "High irrigation requirement"
-
 
     return {
 
@@ -1182,3 +1163,209 @@ def calculate_irrigation(
         "status_en": status_en
 
     }
+
+
+# ============================================================
+# IRRIGATION METHOD WATER FLOW
+# ============================================================
+#
+# NOTE:
+# এগুলো representative/default planning values।
+# নির্দিষ্ট pump, dripper বা sprinkler-এর guaranteed discharge নয়।
+# Actual field discharge ভিন্ন হতে পারে।
+#
+# এই section calculate_irrigation()-এর calculation logic পরিবর্তন করে না।
+# calculate_irrigation() থেকে পাওয়া final water_liters ব্যবহার করে
+# irrigation method অনুযায়ী আনুমানিক সময় হিসাব করা হয়.
+# ============================================================
+
+IRRIGATION_METHODS = {
+
+    "শ্যালো পাম্প দিয়ে সেচ (Shallow Pump)": {
+        "type": "FIXED_FLOW",
+        "default_flow_lph": 60000.0,
+        "default_efficiency": 60
+    },
+
+    "ডিপ টিউবওয়েল দিয়ে সেচ (Deep Tubewell)": {
+        "type": "FIXED_FLOW",
+        "default_flow_lph": 180000.0,
+        "default_efficiency": 60
+    },
+
+    "ড্রিপ/ফোঁটা ফোঁটা সেচ (Drip Irrigation)": {
+        "type": "PER_DRIPPER",
+        "default_flow_per_unit_lph": 3.4,
+        "default_efficiency": 90
+    },
+
+    "স্প্রিংকলার সেচ (Sprinkler Irrigation)": {
+        "type": "PER_SPRINKLER",
+        "default_flow_per_unit_lph": None,
+        "default_efficiency": 75
+    }
+
+}
+
+
+def get_irrigation_method_options():
+    return list(IRRIGATION_METHODS.keys())
+
+
+def get_irrigation_method_config(method_label):
+    return IRRIGATION_METHODS.get(method_label)
+
+
+def calculate_irrigation_time(
+    water_liters,
+    irrigation_needed,
+    method_label,
+    num_drippers=None,
+    num_sprinklers=None,
+    flow_per_sprinkler_lph=None
+):
+    """
+    calculate_irrigation()-এর final water_liters ব্যবহার করে
+    selected irrigation method অনুযায়ী আনুমানিক irrigation time
+    হিসাব করে।
+
+    এখানে ET0, Kc, rainfall, existing water বা মূল irrigation
+    calculation পরিবর্তন করা হয় না।
+    """
+
+    result = {
+        "available": False,
+        "total_flow_lph": None,
+        "hours": None,
+        "needs_flow_input": False,
+        "method_type": None,
+        "num_units": None,
+        "flow_per_unit_lph": None
+    }
+
+    # সেচ প্রয়োজন না হলে সময়ও প্রয়োজন নেই।
+    if not irrigation_needed:
+        return result
+
+    # Water amount valid কি না।
+    try:
+        water_liters = float(water_liters)
+    except (TypeError, ValueError):
+        return result
+
+    if water_liters <= 0:
+        return result
+
+    config = IRRIGATION_METHODS.get(method_label)
+
+    if config is None:
+        return result
+
+    method_type = config.get("type")
+
+    result["method_type"] = method_type
+
+    # ========================================================
+    # SHALLOW PUMP / DEEP TUBEWELL
+    # ========================================================
+
+    if method_type == "FIXED_FLOW":
+
+        total_flow_lph = _safe_float(
+            config.get("default_flow_lph")
+        )
+
+        if total_flow_lph is None or total_flow_lph <= 0:
+            return result
+
+    # ========================================================
+    # DRIP
+    # ========================================================
+
+    elif method_type == "PER_DRIPPER":
+
+        try:
+            num_drippers = float(num_drippers)
+        except (TypeError, ValueError):
+            num_drippers = 0
+
+        if num_drippers <= 0:
+
+            result["needs_flow_input"] = True
+
+            return result
+
+        flow_per_unit = _safe_float(
+            config.get("default_flow_per_unit_lph")
+        )
+
+        if flow_per_unit is None or flow_per_unit <= 0:
+            return result
+
+        total_flow_lph = (
+            num_drippers * flow_per_unit
+        )
+
+        result["num_units"] = num_drippers
+        result["flow_per_unit_lph"] = flow_per_unit
+
+    # ========================================================
+    # SPRINKLER
+    # ========================================================
+
+    elif method_type == "PER_SPRINKLER":
+
+        try:
+            num_sprinklers = float(num_sprinklers)
+        except (TypeError, ValueError):
+            num_sprinklers = 0
+
+        try:
+            flow_per_sprinkler_lph = float(
+                flow_per_sprinkler_lph
+            )
+        except (TypeError, ValueError):
+            flow_per_sprinkler_lph = 0
+
+        if (
+            num_sprinklers <= 0
+            or flow_per_sprinkler_lph <= 0
+        ):
+
+            result["needs_flow_input"] = True
+
+            return result
+
+        total_flow_lph = (
+            num_sprinklers
+            *
+            flow_per_sprinkler_lph
+        )
+
+        result["num_units"] = num_sprinklers
+        result["flow_per_unit_lph"] = (
+            flow_per_sprinkler_lph
+        )
+
+    else:
+
+        return result
+
+    # ========================================================
+    # FINAL TIME
+    # ========================================================
+
+    if total_flow_lph <= 0:
+        return result
+
+    irrigation_hours = (
+        water_liters
+        /
+        total_flow_lph
+    )
+
+    result["available"] = True
+    result["total_flow_lph"] = total_flow_lph
+    result["hours"] = irrigation_hours
+
+    return result
